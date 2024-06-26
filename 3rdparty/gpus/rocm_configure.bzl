@@ -800,11 +800,10 @@ def _create_local_rocm_repository(repository_ctx):
             "%{rccl_lib}": rocm_libs["rccl"].file_name,
             "%{copy_rules}": "\n".join(copy_rules),
             "%{rocm_headers}": ('":rocm-include",\n' +
-                                '":hipfft-include",\n' +
-                                '":rocblas-include",\n' +
-                                '":miopen-include",\n' +
-                                '":rccl-include",\n' +
-                                hiprand_include +
+#                                 '":rocblas-include",\n' +
+#                                 '":miopen-include",\n' +
+#                                 '":rccl-include",\n' +
+#                                 hiprand_include +
                                 rocrand_include),
         },
     )

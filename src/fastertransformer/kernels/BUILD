@@ -1,4 +1,4 @@
-load("//:def.bzl", "copts", "cuda_copts")
+load("//:def.bzl", "copts", "cuda_copts", "rocm_copts")
 
 cc_library(
     name = "kernels_cu",
@@ -56,3 +56,32 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_library(
+    name = "gpt_kernels_rocm",
+    srcs = [
+        "gpt_kernels.cu",
+        "add_residual_kernels.cu",
+        "alpha_layernorm_kernels.cu",
+        "rmsnormKernels.cu",
+        "layernorm_kernels.cu",
+        "activation_kernels.cu",
+    ],
+    hdrs = [
+        "gpt_kernels.h",
+        "add_residual_kernels.h",
+        "alpha_layernorm_kernels.h",
+        "reduce_kernel_utils.cuh",
+        "rmsnormKernels.h",
+        "layernorm_kernels.h",
+        "activation_kernels.h",
+    ],
+    deps = [
+        "@local_config_rocm//rocm:rocm_headers",
+        "@local_config_rocm//rocm:hip",
+        "//src/fastertransformer/cuda:cuda_utils_rocm",
+        "//src/fastertransformer/utils:utils",
+    ],
+    copts = rocm_copts(),
+    include_prefix = "src",
+    visibility = ["//visibility:public"],
+)

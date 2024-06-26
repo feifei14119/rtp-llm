@@ -16,8 +16,12 @@
 
 #pragma once
 
+#if USING_CUDA
 #include <cuda.h>
 #include <cuda_fp16.h>
+#else
+#include "src/fastertransformer/rocm/cuda_shims.h"
+#endif
 
 #include "src/fastertransformer/cuda/cuda_bf16_fallbacks.cuh"
 #include "src/fastertransformer/cuda/cuda_fp8_utils.h"
@@ -240,6 +244,7 @@ template<> __device__ inline half2 cuda_cast<half2, float2>(float2 val) { return
 template<> __device__ inline half2 cuda_cast<half2, float>(float val) { return __float2half2_rn(val); }
 template<> __device__ inline half2 cuda_cast<half2, half>(half val) { return __half2half2(val); }
 
+#if USING_CUDA
 template<> __device__ inline int8_t cuda_cast<int8_t, half>(half val) {
     union { int8_t int8[2]; int16_t int16; };
     union { half fp16; int16_t int16_in; };
@@ -260,6 +265,7 @@ template<> __device__ inline int8_t cuda_cast<int8_t, float>(float val) {
     asm volatile ("cvt.rni.sat.s8.f32 %0, %1;" : "=h"(int16) : "f"(val));
     return int8[0];
 }
+#endif
 
 template<> __device__ inline int16_t cuda_cast<int16_t, float2>(float2 val) {
     union { int8_t int8[2]; int16_t int16; };
@@ -281,8 +287,8 @@ template<> __device__ inline float2 cuda_cast<float2, int16_t>(int16_t val) {
 }
 
 #ifdef ENABLE_BF16
-template<> __device__ inline __nv_bfloat16 cuda_cast(int32_t val) { return static_cast<float>(val); }
-template<> __device__ inline __nv_bfloat16 cuda_cast(int8_t val) { return static_cast<float>(val); }
+template<> __device__ inline __nv_bfloat16 cuda_cast(int32_t val) { return (__nv_bfloat16)static_cast<float>(val); }
+template<> __device__ inline __nv_bfloat16 cuda_cast(int8_t val) { return (__nv_bfloat16)static_cast<float>(val); }
 template<> __device__ inline int8_t cuda_cast(__nv_bfloat16 val) { return static_cast<float>(val); }
 
 template<>
@@ -304,10 +310,7 @@ template<> __device__ inline __nv_bfloat162 cuda_cast<__nv_bfloat162, float2>(fl
 template<> __device__ inline __nv_bfloat162 cuda_cast<__nv_bfloat162, int16_t>(int16_t val) {
     union { int8_t int8[2]; int16_t int16; };
     int16 = val;
-    __nv_bfloat162 res;
-    res.x = cuda_cast<__nv_bfloat16>(int8[0]);
-    res.y = cuda_cast<__nv_bfloat16>(int8[1]);
-    return res;
+    return float22bf162({int8[0], int8[1]});
 }
 
 template<> __device__ inline __nv_bfloat162 cuda_cast<__nv_bfloat162, half2>(half2 val) { return float22bf162(__half22float2(val)); }

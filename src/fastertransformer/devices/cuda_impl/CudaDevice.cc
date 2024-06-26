@@ -22,7 +22,7 @@ CudaDevice::CudaDevice(const DeviceInitParams& params) : DeviceBase(params) {
 
     auto allocator_ptr = new Allocator<AllocatorType::CUDA>(device_id_);
     allocator_ptr->setStream(stream_);
-    auto host_allocator_ptr = new Allocator<AllocatorType::CUDA_HOST>(device_id_);
+    auto cublasptr = new Allocator<AllocatorType::CUDA_HOST>(device_id_);
     host_allocator_ptr->setStream(stream_);
 
     if (params.device_reserve_memory_bytes) {

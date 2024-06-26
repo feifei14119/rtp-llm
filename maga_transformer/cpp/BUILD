@@ -143,7 +143,7 @@ cc_library(
         ":dataclass",
         ":utils",
         "//src/fastertransformer/devices:devices_base",
-        "//src/fastertransformer/devices/cpu_impl:cpu_impl",
+        # "//src/fastertransformer/devices/cpu_impl:cpu_impl",
     ],
     visibility = ["//visibility:public"]
 )

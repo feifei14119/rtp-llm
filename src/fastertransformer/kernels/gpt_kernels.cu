@@ -16,12 +16,14 @@
 
 #include <assert.h>
 #include "src/fastertransformer/cuda/cuda_fp8_utils.h"
+#if USING_CUDA
 #ifndef CUDART_VERSION
 #error CUDART_VERSION Undefined!
 #elif (CUDART_VERSION >= 11050)
 #include <cub/cub.cuh>
 #else
 #include "3rdparty/cub/cub.cuh"
+#endif
 #endif
 #include "src/fastertransformer/kernels/gpt_kernels.h"
 #include "src/fastertransformer/cuda/memory_utils.h"
@@ -49,7 +51,7 @@ __global__ void embedding_lookup_kernel(T*                    from_tensor,
         T         pos_embed       = (T)0.0f;
         T         type_embed      = (T)0.0f;
         embedding = embedding_table[input_id * hidden_units + col_index];
-        embedding *= input_embedding_scalar;
+        embedding *= (T)input_embedding_scalar;
 
         if constexpr(USE_POS_EMB) {
             assert(pos_table != nullptr);
@@ -457,7 +459,7 @@ DEFINE_INVOKETRANSPOSE(int64_t);
 DEFINE_INVOKETRANSPOSE(uint64_t);
 DEFINE_INVOKETRANSPOSE(float);
 DEFINE_INVOKETRANSPOSE(half);
-DEFINE_INVOKETRANSPOSE(nv_bfloat16);
+DEFINE_INVOKETRANSPOSE(__nv_bfloat16);
 
 template<typename T>
 __global__ void transposeAxis12(T* out, T* in, const int dim0, const int dim1, const int dim2, const int dim3)
@@ -807,6 +809,7 @@ void invokeTileGptInputs(int*         tiled_input_ids,
                               stream);
 }
 
+#if USING_CUDA
 void setSeqLimitLen(uint32_t* seq_len_d, Tensor seq_len, int limit_len_offset, int batch_size)
 {
     std::vector<uint32_t> seq_len_h(batch_size);
@@ -815,6 +818,7 @@ void setSeqLimitLen(uint32_t* seq_len_d, Tensor seq_len, int limit_len_offset, i
     }
     cudaH2Dcpy(seq_len_d, seq_len_h.data(), batch_size);
 }
+
 
 template<int TB_SIZE>
 __global__ void
@@ -955,6 +959,7 @@ void invokeFindContextDups(int*         shared_contexts,
     generate_dups_indices<<<1, DUPS_INDICES_BLOCK_SIZE, 0, stream>>>(
         batch_to_compact, compact_to_batch, compact_size, shared_contexts, batch_size, input_seq_len);
 }
+#endif
 
 template<typename T>
 __global__ void compact_inputs(T*         compact_input,

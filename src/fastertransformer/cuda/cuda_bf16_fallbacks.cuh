@@ -16,8 +16,16 @@
 
 #pragma once
 
+#if USING_CUDA
 #include "src/fastertransformer/cuda/cuda_utils.h"
 #include <cuda_fp16.h>
+#else
+#include "src/fastertransformer/rocm/cuda_shims.h"
+#endif
+
+#if !USING_CUDA
+#define __CUDA_ARCH__ 0
+#endif
 
 namespace fastertransformer {
 
@@ -251,5 +259,9 @@ inline __device__ __nv_bfloat162 bf16hfma2(__nv_bfloat162 a, __nv_bfloat162 b, _
 }
 
 #endif // ENABLE_BF16
+
+#if !USING_CUDA
+#undef __CUDA_ARCH__
+#endif
 
 }  // namespace fastertransformer
