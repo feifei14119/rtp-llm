@@ -5,15 +5,20 @@
 #include "src/fastertransformer/utils/logger.h"
 #include "src/fastertransformer/core/Types.h"
 
-#include <cuda_runtime.h>
+
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <functional>
 
+#if USING_CUDA
+#include <cuda_runtime.h>
 #ifdef ENABLE_BF16
 #include <cuda_bf16.h>
+#endif
+#else
+#include "src/fastertransformer/rocm/cuda_shims.h"
 #endif
 
 namespace fastertransformer {

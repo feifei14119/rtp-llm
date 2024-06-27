@@ -18,7 +18,9 @@
 
 #include "src/fastertransformer/core/Tensor.h"
 #include "src/fastertransformer/cuda/cuda_fp8_utils.h"
+#if USING_CUDA
 #include "src/fastertransformer/cuda/cuda_utils.h"
+#endif
 
 namespace fastertransformer {
 
@@ -49,6 +51,7 @@ void cudaAutoCpy(T* tgt, const T* src, const size_t size, cudaStream_t stream = 
 template<typename T>
 void cudaRandomUniform(T* buffer, const size_t size);
 
+#if USING_CUDA
 template<typename T>
 int loadWeightFromBin(T*                  ptr,
                       std::vector<size_t> shape,
@@ -61,6 +64,7 @@ int loadWeightFromBinAndQuantizeForWeightOnly(int8_t*             quantized_weig
                                               std::vector<size_t> shape,
                                               std::string         filename,
                                               FtCudaDataType      model_file_type = FtCudaDataType::FP32);
+#endif
 
 void invokeCudaD2DcpyHalf2Float(float* dst, half* src, const size_t size, cudaStream_t stream);
 void invokeCudaD2DcpyFloat2Half(half* dst, float* src, const size_t size, cudaStream_t stream);
@@ -134,7 +138,9 @@ void saveToBinary(const T* ptr, const size_t size, std::string filename);
 template<typename T_IN, typename T_fake_type>
 void invokeFakeCast(T_IN* input_ptr, const size_t size, cudaStream_t stream);
 
+#if USING_CUDA
 size_t cuda_datatype_size(FtCudaDataType dt);
+#endif
 
 template<typename T>
 bool invokeCheckRange(T* buffer, const size_t size, T min, T max, bool* d_within_range, cudaStream_t stream);
