@@ -1,4 +1,4 @@
-load("//:def.bzl", "copts", "torch_deps")
+load("//:def.bzl", "copts", "torch_deps", "rocm_copts")
 load("//src/fastertransformer/devices:device_defs.bzl",
     "device_impl_target", "device_test_envs", "device_linkopts")
 
@@ -9,12 +9,18 @@ test_copts = [
 test_linkopts = [
     "-lpython3.10",
     "-ltorch",
+    "-L/opt/rocm/lib",
+    "-lrocblas",
+    "-lhipblas",
+    "-lhipblaslt",
 ]
 
 test_deps = [
     "//src/fastertransformer/devices/rocm_impl:rocm_impl",
     "//src/fastertransformer/devices/testing:device_test_utils",
     "//src/fastertransformer/devices/base_tests:base_tests",
+    "@local_config_rocm//rocm:rocm_headers",
+    "@local_config_rocm//rocm:rocblas",
 ] + torch_deps()
 
 
@@ -42,3 +48,16 @@ cc_test(
     deps = test_deps,
     tags = ["rocm"],
 )
+
+cc_test(
+    name = "gemm_op_test",
+    srcs = [
+        "ops/ROCmGemmOpTest.cc",
+    ],
+    data = [],
+    env = device_test_envs(),
+    copts = test_copts + copts(),
+    linkopts = test_linkopts,
+    deps = test_deps,
+)
+

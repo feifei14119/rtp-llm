@@ -1,6 +1,12 @@
 #pragma once
 
+#include <hip/hip_runtime.h>
+#if ENABLE_BF16
+#include <hip/hip_fp16.h>
+#endif
+
 #include "src/fastertransformer/devices/DeviceBase.h"
+#include "src/fastertransformer/rocm/hipblasMMWrapper.h"
 
 namespace fastertransformer {
 
@@ -21,10 +27,20 @@ public:
     void activation(const ActivationParams& params) override;
     AttentionModuleOutput contextAttention(const AttentionModuleParams& params) override;
 
+public:
+    hipblasMMWrapper* hipblasMMWrapperPtr() const {return hipblas_mm_wrapper_.get();}
+
 private:
+    hipDeviceProp_t device_prop_;
     std::unique_ptr<IAllocator> allocator_;
     std::unique_ptr<IAllocator> hostAllocator_;
     hipStream_t stream_ = nullptr;
+    std::mutex hipblas_wrapper_mutex_;
+    hipblasHandle_t hipblas_handle_;
+    hipblasLtHandle_t hipblaslt_handle_;
+
+    std::unique_ptr<rocm::cublasAlgoMap> hipblas_algo_map_;
+    std::unique_ptr<hipblasMMWrapper> hipblas_mm_wrapper_;
 };
 
 } // namespace fastertransformer

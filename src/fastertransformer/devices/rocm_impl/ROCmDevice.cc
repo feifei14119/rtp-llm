@@ -1,21 +1,17 @@
 #include "src/fastertransformer/devices/rocm_impl/ROCmDevice.h"
 #include "src/fastertransformer/devices/rocm_impl/ROCmAllocator.h"
 #include "src/fastertransformer/devices/DeviceFactory.h"
-#include "src/fastertransformer/kernels/gpt_kernels.h"
-#include "src/fastertransformer/kernels/layernorm_kernels.h"
-#include "src/fastertransformer/kernels/rmsnormKernels.h"
-#include "src/fastertransformer/kernels/add_residual_kernels.h"
-#include "src/fastertransformer/kernels/activation_kernels.h"
-#include "src/fastertransformer/cuda/Dispatch.h"
 #include "src/fastertransformer/utils/ShapeCheck.h"
 #include <cstring>
 
 #include <hip/hip_runtime.h>
 
 // TODO(rocm): Idealy we just link compiler_rt for this symbol.
+#if ENABLE_BF16
 extern "C" half __truncdfhf2(double a) {
     return (half)(float)a;
 }
+#endif
 
 namespace fastertransformer {
 
@@ -27,9 +23,28 @@ ROCmDevice::ROCmDevice(const DeviceInitParams& params): DeviceBase(params) {
     hostAllocator_.reset(new Allocator<AllocatorType::ROCM_HOST>());
     (void)hipSetDevice(0);
     (void)hipStreamCreate(&stream_);
+    hipblasCreate(&hipblas_handle_);
+    hipblasLtCreate(&hipblaslt_handle_);
+    hipGetDeviceProperties(&device_prop_, device_id_);
+
+    hipblas_algo_map_.reset(new rocm::cublasAlgoMap());
+
+    hipblas_mm_wrapper_.reset(
+       new hipblasMMWrapper(hipblas_handle_, 
+                            hipblaslt_handle_, 
+                            stream_, 
+                            hipblas_algo_map_.get(),
+                            &hipblas_wrapper_mutex_, 
+                            allocator_.get()));
+   // hipblas_mm_wrapper_->setGemmConfig(CUDA_R_16F, CUDA_R_16F, CUDA_R_16F, CUDA_R_32F);
 }
 
 ROCmDevice::~ROCmDevice() {
+    hipblas_mm_wrapper_.reset();
+    hipStreamDestroy(stream_);
+    hipblasDestroy(hipblas_handle_);
+    hipblasLtDestroy(hipblaslt_handle_);
+
     if (stream_ != nullptr) {
         (void)hipStreamDestroy(stream_);
     }
@@ -97,112 +112,6 @@ void ROCmDevice::syncAndCheck() {
     (void)hipDeviceSynchronize();
 }
 
-struct GemmArguments {
-    std::vector<size_t> Ashape;
-    std::vector<size_t> Bshape;
-    std::vector<size_t> Cshape;
-    std::vector<size_t> Dshape;
-
-    DataType ADtype;
-    DataType BDtype;
-    DataType CDtype;
-    DataType DDtype;
-
-    size_t dim;
-    size_t batch_size;
-    size_t m;
-    size_t k;
-    size_t n;
-
-    float alpha = 1.0f;
-    float beta  = 0.0f;
-
-    size_t lda;
-    size_t stride_a;
-    size_t ldb;
-    size_t stride_b;
-    size_t ldc;
-    size_t stride_c;
-
-    GemmArguments(const GemmParams& params) {
-
-        Ashape = params.A.shape();
-        Bshape = params.B.shape();
-
-        if (params.transA == TransposeOperation::TRANSPOSE) {
-            std::iter_swap(Ashape.end() - 1, Ashape.end() - 2);
-        }
-
-        if (params.transB == TransposeOperation::TRANSPOSE) {
-            std::iter_swap(Bshape.end() - 1, Bshape.end() - 2);
-        }
-
-        if (params.C != std::nullopt) {
-            Cshape = params.C.value().get().shape();
-        }
-
-        ADtype = params.A.type();
-        BDtype = params.A.type();
-        if (params.C != std::nullopt) {
-            CDtype = params.C.value().get().type();
-        }
-        DDtype = (params.compute_type == DataType::TYPE_INVALID) ? params.A.type() : params.compute_type;
-
-        dim        = params.A.dim();
-        batch_size = std::accumulate(Ashape.begin(), Ashape.end() - 2, (size_t)1, std::multiplies<size_t>());
-
-        m = Ashape[dim - 2];
-        k = Ashape[dim - 1];
-        n = Bshape[dim - 1];
-
-        Dshape = std::vector<size_t>(Ashape.begin(), Ashape.end() - 2);
-        Dshape.insert(Dshape.end(), {m, n});
-
-        lda      = params.A.shape()[dim - 1];
-        stride_a = m * k;
-        ldb      = params.B.shape()[dim - 1];
-        stride_b = k * n;
-        ldc      = n;
-        stride_c = m * n;
-    }
-
-    void dump() {
-        std::cerr << "Ashape is : " << ShapeStringView(Ashape) << "\n"
-                  << "Bshape is : " << ShapeStringView(Bshape) << "\n"
-                  << "Cshape is : " << ShapeStringView(Cshape) << "\n"
-                  << "Dshape is : " << ShapeStringView(Dshape) << "\n"
-                  << "dim is : " << dim << "\n"
-                  << "batch size is : " << batch_size << "\n"
-                  << "m is : " << m << "\n"
-                  << "n is : " << n << "\n"
-                  << "k is : " << k << "\n"
-                  << "lda is : " << lda << "\n"
-                  << "ldb is : " << ldb << "\n"
-                  << "ldc is : " << ldc << "\n"
-                  << "stride_a is : " << stride_a << "\n"
-                  << "stride_b is : " << stride_b << "\n"
-                  << "stride_c is : " << stride_c << "\n"
-                  << std::endl;
-    }
-};
-
-BufferPtr ROCmDevice::gemm(const GemmParams& params) {
-    params.check();
-
-    GemmArguments arguments(params);
-
-    std::cerr << "gemm " << int(params.A.type()) << " " << int(params.compute_type) << '\n';
-    arguments.dump();
-
-    BufferPtr output;
-    if (params.D) {
-        output = params.D;
-    } else {
-        output = allocateBuffer({arguments.DDtype, arguments.Dshape, AllocationType::DEVICE}, {"gemm_output"});
-    }
-    return output;
-}
-
 SelectOutput ROCmDevice::select(const SelectParams& params) {
     if ((params.input.where() != MemoryType::MEMORY_GPU) || (params.dim > 0)) {
         return DeviceBase::select(params);
@@ -216,7 +125,7 @@ SelectOutput ROCmDevice::select(const SelectParams& params) {
     output_shape[0]           = params.index.size();
     auto num_selected_element = input.size() / input.shape()[0];
     auto output               = allocateBuffer({input.type(), output_shape});
-    DISPATCH_CUDA_FUNCTION_DATA_TYPE(input.type(),
+    /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(input.type(),
                                      invokeLookupHiddenStateOfLastToken,
                                      output->data(),
                                      input.data(),
@@ -224,7 +133,7 @@ SelectOutput ROCmDevice::select(const SelectParams& params) {
                                      (int)params.index.size(),
                                      num_selected_element,
                                      0,
-                                     stream_);
+                                     stream_);*/
     return std::move(output);
 }
 
@@ -242,7 +151,7 @@ BufferPtr ROCmDevice::embeddingLookup(const EmbeddingLookupParams& params) {
 
     auto embeddings = allocateBuffer({data_type, {token_num, hidden_size}}, {"embedding"});
 
-    DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
+    /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
                                      invokeEmebeddingLookup,
                                      embeddings->data(),
                                      embedding_table.data(),
@@ -254,7 +163,7 @@ BufferPtr ROCmDevice::embeddingLookup(const EmbeddingLookupParams& params) {
                                      token_types.has_value() ? token_types.value().get().data<int>() : nullptr,
                                      token_num,
                                      hidden_size,
-                                     stream_);
+                                     stream_);*/
 
     return std::move(embeddings);
 }
@@ -275,7 +184,7 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
     if (!weights.has_value()) {
         if (params.alpha.has_value() || (norm_type == NormType::alphanorm)) {
             const auto alpha = params.alpha.value_or(1.0f);
-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
+            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
                                              invokeAlphaAddBiasResidual,
                                              output.data(),
                                              input.data(),
@@ -284,9 +193,9 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
                                              alpha,
                                              m,
                                              n,
-                                             stream_);
+                                             stream_);*/
         } else if (params.bias.has_value() || params.residual1.has_value() || params.residual2.has_value()) {
-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
+            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
                                              invokeAddBiasResidual,
                                              output.data(),
                                              input.data(),
@@ -297,7 +206,7 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
                                              nullptr,  // scale_out
                                              m,
                                              n,
-                                             stream_);
+                                             stream_);*/
         } else {
             throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);
         }
@@ -310,7 +219,7 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
     if (params.residual1.has_value() || params.bias.has_value()) {
         const auto& add_bias_output = params.add_bias_output ? params.add_bias_output.value().get() : output;
         if (params.norm_type == NormType::layernorm) {
-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
+            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
                                              invokeGeneralAddBiasResidualLayerNorm,
                                              add_bias_output.data(),
                                              output.data(),
@@ -327,9 +236,9 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
                                              nullptr,  // scale
                                              nullptr,  // dynamic_scale
                                              nullptr   // out_quant
-            );
+            );*/
         } else if (params.norm_type == NormType::rmsnorm) {
-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
+            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
                                              invokeAddBiasResidualRmsNorm,
                                              add_bias_output.data(),
                                              output.data(),
@@ -345,13 +254,13 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
                                              nullptr,  // scale
                                              nullptr,  // dynamic_scale
                                              nullptr   // out_quant
-            );
+            );*/
         } else {
             throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);
         }
     } else {
         if (params.norm_type == NormType::layernorm) {
-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
+            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
                                              invokeGeneralLayerNorm,
                                              output.data(),
                                              input.data(),
@@ -365,9 +274,9 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
                                              nullptr,  // scale
                                              nullptr,  // dynamic_scale
                                              nullptr   // out_quant
-            );
+            );*/
         } else if (params.norm_type == NormType::rmsnorm) {
-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
+            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
                                              invokeGeneralRmsNorm,
                                              output.data(),
                                              input.data(),
@@ -380,7 +289,7 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
                                              nullptr,  // scale
                                              nullptr,  // dynamic_scale
                                              nullptr   // out_quant
-            );
+            );*/
         } else {
             throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);
         }
@@ -453,7 +362,7 @@ void ROCmDevice::activation(const ActivationParams& params) {
         gate_bias = params.gate_bias.value().get().data();
     }
 
-    DISPATCH(states.type(), params.atype, states.data(), bias, gate, gate_bias, m, n, stream_);
+    //DISPATCH(states.type(), params.atype, states.data(), bias, gate, gate_bias, m, n, stream_);
 }
 
 AttentionModuleOutput ROCmDevice::contextAttention(const AttentionModuleParams& params) {
