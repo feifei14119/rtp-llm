@@ -28,7 +28,7 @@ protected:
     hipblasDatatype_t computeType_;
 
     hipStream_t   stream_;
-    rocm::cublasAlgoMap* cublas_algo_map_;
+    rocm::hipblasAlgoMap* cublas_algo_map_;
     std::mutex*    mu_;
 
     IAllocator* allocator_        = nullptr;
@@ -53,7 +53,7 @@ public:
     hipblasMMWrapper(hipblasHandle_t   cublas_handle_,
                     hipblasLtHandle_t cublaslt_handle_,
                     hipStream_t     stream,
-                    rocm::cublasAlgoMap*   map,
+                    rocm::hipblasAlgoMap*   map,
                     std::mutex*      mu,
                     IAllocator*      allocator);
 
@@ -62,7 +62,7 @@ public:
                     hipblasLtHandle_t   cublaslt_handle_,
                     cusparseLtHandle_t cusparselt_handle,
                     hipStream_t       stream,
-                    rocm::cublasAlgoMap*     map,
+                    rocm::hipblasAlgoMap*     map,
                     std::mutex*        mu,
                     IAllocator*        allocator);
 #endif
@@ -152,7 +152,7 @@ public:
 
     void setGemmConfig(hipblasDatatype_t aType, hipblasDatatype_t bType, hipblasDatatype_t cType, hipblasDatatype_t computeType);
 
-    rocm::CublasDataType getCublasDataType(hipblasDatatype_t data_type);
+    rocm::HipblasDataType getCublasDataType(hipblasDatatype_t data_type);
 
     hipDataType getHiblasLtDataType(hipblasDatatype_t data_type);
 

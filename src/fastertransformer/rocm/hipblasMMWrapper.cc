@@ -6,7 +6,7 @@ using namespace rocm;
 hipblasMMWrapper::hipblasMMWrapper(hipblasHandle_t   cublas_handle,
                                  hipblasLtHandle_t cublaslt_handle,
                                  hipStream_t     stream,
-                                 cublasAlgoMap*   cublas_algo_map,
+                                 hipblasAlgoMap*   cublas_algo_map,
                                  std::mutex*      mu,
                                  IAllocator*      allocator):
     cublas_handle_(cublas_handle),
@@ -21,7 +21,7 @@ hipblasMMWrapper::hipblasMMWrapper(hipblasHandle_t   cublas_handle,
 //    printf("\n------------hipblasMMWrapper 2 -----------------\n");
 //    if (allocator_ != nullptr) {
 //    printf("\n------------hipblasMMWrapper 3 -----------------\n");
-//        cublas_workspace_ = allocator_->reMalloc(cublas_workspace_, CUBLAS_WORKSPACE_SIZE);
+//        cublas_workspace_ = allocator_->reMalloc(cublas_workspace_, HIPBLAS_WORKSPACE_SIZE);
 //    }
 //    printf("\n------------hipblasMMWrapper 4 -----------------\n");
 }
@@ -31,7 +31,7 @@ hipblasMMWrapper::hipblasMMWrapper(hipblasHandle_t     cublas_handle,
                                  cublasLtHandle_t   cublaslt_handle,
                                  cusparseLtHandle_t cusparselt_handle,
                                  hipStream_t       stream,
-                                 cublasAlgoMap*     cublas_algo_map,
+                                 hipblasAlgoMap*     cublas_algo_map,
                                  std::mutex*        mu,
                                  IAllocator*        allocator):
     cublas_handle_(cublas_handle),
@@ -44,7 +44,7 @@ hipblasMMWrapper::hipblasMMWrapper(hipblasHandle_t     cublas_handle,
 {
     FT_LOG_DEBUG(__PRETTY_FUNCTION__);
     if (allocator_ != nullptr) {
-        cublas_workspace_ = allocator_->reMalloc(cublas_workspace_, CUBLAS_WORKSPACE_SIZE, false);
+        cublas_workspace_ = allocator_->reMalloc(cublas_workspace_, HIPBLAS_WORKSPACE_SIZE, false);
     }
 }
 #endif
@@ -72,7 +72,7 @@ hipblasMMWrapper::hipblasMMWrapper(const hipblasMMWrapper& wrapper):
 {
     FT_LOG_DEBUG(__PRETTY_FUNCTION__);
     if (allocator_ != nullptr) {
-        cublas_workspace_ = allocator_->reMalloc(cublas_workspace_, CUBLAS_WORKSPACE_SIZE);
+        cublas_workspace_ = allocator_->reMalloc(cublas_workspace_, HIPBLAS_WORKSPACE_SIZE);
     }
 }
 
@@ -130,7 +130,7 @@ void hipblasMMWrapper::Gemm(hipblasOperation_t transa,
                                   ldc,
                                   computeType,
                                   algo));
-    sync_check_cuda_error();
+    sync_check_hip_error();
     mu_->unlock();
 }
 
@@ -180,7 +180,7 @@ void hipblasMMWrapper::Gemm(hipblasOperation_t transa,
 
     int findAlgo = cublas_algo_map_->isExist(batch_count, m, n, k, getCublasDataType(Atype_));
 
-    cublasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(Atype_));
+    hipblasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(Atype_));
     
     if (findAlgo) {
         using_cublasLt = true;
@@ -209,7 +209,7 @@ void hipblasMMWrapper::Gemm(hipblasOperation_t transa,
 
         hipblasLtMatmulAlgo_t algo;
         void*                workSpace     = cublas_workspace_;
-        int                  workspaceSize = cublas_workspace_ == NULL ? 0 : CUBLAS_WORKSPACE_SIZE;
+        int                  workspaceSize = cublas_workspace_ == NULL ? 0 : HIPBLAS_WORKSPACE_SIZE;
         std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResult(1);
         if (findAlgo) {
             if (info.workspaceSize > workspaceSize) {
@@ -243,7 +243,7 @@ void hipblasMMWrapper::Gemm(hipblasOperation_t transa,
         hipblasLtMatrixLayoutDestroy(Adesc);
         hipblasLtMatrixLayoutDestroy(Bdesc);
         hipblasLtMatrixLayoutDestroy(Cdesc);
-        sync_check_cuda_error();
+        sync_check_hip_error();
     }
     else 
     {
@@ -267,7 +267,7 @@ void hipblasMMWrapper::Gemm(hipblasOperation_t transa,
                                       ldc,
                                       computeType_,
                                       static_cast<hipblasGemmAlgo_t>(cublasAlgo)));
-        sync_check_cuda_error();
+        sync_check_hip_error();
     }
     mu_->unlock();
 }
@@ -309,7 +309,7 @@ void hipblasMMWrapper::setGemmConfig(hipblasDatatype_t aType,
     computeType_ = computeType;
 }
 
-CublasDataType hipblasMMWrapper::getCublasDataType(hipblasDatatype_t data_type)
+HipblasDataType hipblasMMWrapper::getCublasDataType(hipblasDatatype_t data_type)
 {
     if (data_type == HIPBLAS_R_16F) {
         return HALF_DATATYPE;
@@ -432,7 +432,7 @@ void hipblasMMWrapper::stridedBatchedGemm(hipblasOperation_t transa,
     const void* alpha =
         is_fp16_computeType ? reinterpret_cast<void*>(&h_alpha) : reinterpret_cast<const void*>(&f_alpha);
     const void* beta = is_fp16_computeType ? reinterpret_cast<void*>(&h_beta) : reinterpret_cast<const void*>(&f_beta);
-    cublasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(Atype_));
+    hipblasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(Atype_));
 
     check_hip_error(hipblasGemmStridedBatchedEx(cublas_handle_,
                                                 transa,
@@ -491,7 +491,7 @@ void hipblasMMWrapper::stridedBatchedGemm(hipblasOperation_t transa,
     const void* alpha =
         is_fp16_computeType ? reinterpret_cast<void*>(&h_alpha) : reinterpret_cast<const void*>(&f_alpha);
     const void* beta = is_fp16_computeType ? reinterpret_cast<void*>(&h_beta) : reinterpret_cast<const void*>(&f_beta);
-    cublasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(Atype_));
+    hipblasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(Atype_));
 
     check_hip_error(hipblasGemmStridedBatchedEx(cublas_handle_,
                                                 transa,
@@ -543,7 +543,7 @@ void hipblasMMWrapper::batchedGemm(hipblasOperation_t  transa,
     int         is_fp16_computeType = computeType_ == HIPBLAS_R_16F ? 1 : 0;
     const void* alpha = is_fp16_computeType ? reinterpret_cast<void*>(&h_alpha) : reinterpret_cast<void*>(&f_alpha);
     const void* beta  = is_fp16_computeType ? reinterpret_cast<void*>(&h_beta) : reinterpret_cast<void*>(&f_beta);
-    cublasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(Atype_));
+    hipblasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(Atype_));
 
     check_hip_error(hipblasGemmBatchedEx(cublas_handle_,
                                          transa,
@@ -570,7 +570,7 @@ void hipblasMMWrapper::batchedGemm(hipblasOperation_t  transa,
 
 bool hipblasMMWrapper::isFuseBatchGemm(const int batch_count, const int m, const int k, const int n)
 {
-    CublasDataType data_type = getCublasDataType(Atype_);
+    HipblasDataType data_type = getCublasDataType(Atype_);
 
     if (cublas_algo_map_->isExist(batch_count, m, k, n, data_type) == false
         || cublas_algo_map_->isExist(1, m, k, n, data_type) == false) {
@@ -684,7 +684,7 @@ void hipblasMMWrapper::SpGemm(hipblasOperation_t transa,
     CHECK_CUSPARSE(
         cusparseLtMatmul(&cusparselt_handle_, &plan, &_alpha, A, B, &_beta, C, C, d_workspace, streams, num_streams))
     CHECK_CUSPARSE(cusparseLtMatmulPlanDestroy(&plan))
-    sync_check_cuda_error();
+    sync_check_hip_error();
     mu_->unlock();
 }
 
@@ -722,7 +722,7 @@ void hipblasMMWrapper::compressMatrix(const void* input, void* output, const int
     CHECK_CUSPARSE(cusparseLtStructuredDescriptorInit(
         &cusparselt_handle_, &matA, m, k, m, alignment, HIPBLAS_R_16F, order, CUSPARSELT_SPARSITY_50_PERCENT))
     CHECK_CUSPARSE(cusparseLtSpMMACompress2(&cusparselt_handle_, &matA, true, opA, input, output, stream_))
-    sync_check_cuda_error();
+    sync_check_hip_error();
 }
 
 bool hipblasMMWrapper::isUseSparse(const int batch_count, const int m, const int n, const int k)
@@ -763,7 +763,7 @@ return {false, cublasLtMatmulAlgo_t{}};
     cublasLtMatmulPreference_t preference;
     check_hip_error(cublasLtMatmulPreferenceCreate(&preference));
     check_hip_error(cublasLtMatmulPreferenceInit(preference));
-    uint64_t workspace_size = CUBLAS_WORKSPACE_SIZE;
+    uint64_t workspace_size = HIPBLAS_WORKSPACE_SIZE;
     check_hip_error(cublasLtMatmulPreferenceSetAttribute(
         preference, CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES, &workspace_size, sizeof(workspace_size)));
 #if (CUBLAS_VERSION) <= 12000
@@ -815,7 +815,7 @@ return {false, cublasLtMatmulAlgo_t{}};
                                             Ddesc,
                                             &algo,
                                             cublas_workspace_,
-                                            CUBLAS_WORKSPACE_SIZE,
+                                            HIPBLAS_WORKSPACE_SIZE,
                                             stream));
             hipEventRecord(stop_event, stream);
             hipEventSynchronize(stop_event);
@@ -960,7 +960,7 @@ void hipblasMMWrapper::_Int8Gemm(const int     m,
 
     int findAlgo = cublas_algo_map_->isExist(batch_count, m, n, k, getCublasDataType(dataType));
 
-    cublasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(dataType));
+    hipblasLtMatmulAlgo_info info = cublas_algo_map_->getAlgo(batch_count, m, n, k, getCublasDataType(dataType));
 
     cublasLtMatmulDesc_t operationDesc = NULL;
     cublasLtMatrixLayout_t Adesc = NULL, Bdesc = NULL, Cdesc = NULL;
@@ -1000,9 +1000,9 @@ void hipblasMMWrapper::_Int8Gemm(const int     m,
 
     cublasLtMatmulAlgo_t algo;
     void* workSpace = cublas_workspace_;
-    int workspaceSize = cublas_workspace_ == NULL ? 0 : CUBLAS_WORKSPACE_SIZE;
+    int workspaceSize = cublas_workspace_ == NULL ? 0 : HIPBLAS_WORKSPACE_SIZE;
 
-    sync_check_cuda_error();
+    sync_check_hip_error();
     auto ret = cublasLtMatmulWrapper(cublaslt_handle_,
                                      operationDesc,
                                      alpha,
@@ -1020,13 +1020,13 @@ void hipblasMMWrapper::_Int8Gemm(const int     m,
                                      workspaceSize,
                                      stream_);
     check_hip_error(ret);
-    sync_check_cuda_error();
+    sync_check_hip_error();
 
     cublasLtMatmulDescDestroy(operationDesc);
     cublasLtMatrixLayoutDestroy(Adesc);
     cublasLtMatrixLayoutDestroy(Bdesc);
     cublasLtMatrixLayoutDestroy(Cdesc);
-    sync_check_cuda_error();
+    sync_check_hip_error();
     mu_->unlock();
 #endif
 #endif

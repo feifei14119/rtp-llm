@@ -4,14 +4,14 @@
 namespace fastertransformer {
 namespace rocm {
 
-cublasAlgoMap::cublasAlgoMap(const std::string filename, const std::string sp_config_filename):
+hipblasAlgoMap::hipblasAlgoMap(const std::string filename, const std::string sp_config_filename):
     config_filename_(filename), sp_config_filename_(sp_config_filename)
 {
     loadGemmConfig();
     loadSpGemmConfig();
 }
 
-cublasAlgoMap::cublasAlgoMap(const cublasAlgoMap& algo_map):
+hipblasAlgoMap::hipblasAlgoMap(const hipblasAlgoMap& algo_map):
     config_filename_(algo_map.config_filename_),
     sp_config_filename_(algo_map.sp_config_filename_),
     algo_map_(algo_map.algo_map_),
@@ -19,12 +19,12 @@ cublasAlgoMap::cublasAlgoMap(const cublasAlgoMap& algo_map):
 {
 }
 
-cublasAlgoMap::~cublasAlgoMap()
+hipblasAlgoMap::~hipblasAlgoMap()
 {
     algo_map_.clear();
 }
 
-void cublasAlgoMap::loadGemmConfig()
+void hipblasAlgoMap::loadGemmConfig()
 {
     FILE* fd;
     fd = fopen(config_filename_.c_str(), "r");
@@ -72,7 +72,7 @@ void cublasAlgoMap::loadGemmConfig()
             printf("[WARNING][readAlgoFromConfig] wrong dataType %d!\n", dataType);
             continue;
         }
-        cublasAlgoConfig_t markStr{batchCount2, m2, n2, k2, static_cast<CublasDataType>(dataType)};
+        hipblasAlgoConfig_t markStr{batchCount2, m2, n2, k2, static_cast<HipblasDataType>(dataType)};
         // workspaceSize should be zero
         if (algo_map_.find(markStr) == algo_map_.end()) {
             algo_map_[markStr].algoId          = algoId;
@@ -88,22 +88,22 @@ void cublasAlgoMap::loadGemmConfig()
     fclose(fd);
 }
 
-bool cublasAlgoMap::isExist(
-    const int batch_count, const int m, const int n, const int k, const CublasDataType data_type)
+bool hipblasAlgoMap::isExist(
+    const int batch_count, const int m, const int n, const int k, const HipblasDataType data_type)
 {
-    cublasAlgoConfig_t mark{batch_count, n, m, k, data_type};
+    hipblasAlgoConfig_t mark{batch_count, n, m, k, data_type};
     return algo_map_.find(mark) != algo_map_.end();
 }
 
-cublasLtMatmulAlgo_info
-cublasAlgoMap::getAlgo(const int batch_count, const int m, const int n, const int k, const CublasDataType data_type)
+hipblasLtMatmulAlgo_info
+hipblasAlgoMap::getAlgo(const int batch_count, const int m, const int n, const int k, const HipblasDataType data_type)
 {
-    cublasAlgoConfig_t mark{batch_count, n, m, k, data_type};
+    hipblasAlgoConfig_t mark{batch_count, n, m, k, data_type};
     if (algo_map_.find(mark) != algo_map_.end()) {
         return algo_map_[mark];
     }
     else {
-        cublasLtMatmulAlgo_info tmp_algo;
+        hipblasLtMatmulAlgo_info tmp_algo;
         tmp_algo.algoId = static_cast<int>(HIPBLAS_GEMM_DEFAULT);
         tmp_algo.customOption    = -1;
         tmp_algo.tile            = -1;
@@ -116,7 +116,7 @@ cublasAlgoMap::getAlgo(const int batch_count, const int m, const int n, const in
     }
 }
 
-void cublasAlgoMap::loadSpGemmConfig()
+void hipblasAlgoMap::loadSpGemmConfig()
 {
     if (sp_config_filename_.empty()) {
         return;
@@ -157,7 +157,7 @@ void cublasAlgoMap::loadSpGemmConfig()
     fclose(fd);
 }
 
-int cublasAlgoMap::getSpAlgo(const int batch_count, const int m, const int n, const int k)
+int hipblasAlgoMap::getSpAlgo(const int batch_count, const int m, const int n, const int k)
 {
     char mark[256];
     sprintf(mark, "%d_%d_%d_%d", batch_count, m, n, k);
@@ -170,7 +170,7 @@ int cublasAlgoMap::getSpAlgo(const int batch_count, const int m, const int n, co
     }
 }
 
-bool cublasAlgoMap::isUseSparse(const int batch_count, const int m, const int n, const int k)
+bool hipblasAlgoMap::isUseSparse(const int batch_count, const int m, const int n, const int k)
 {
     // not available to use cusparselt.
     if (m % 8 != 0 || n % 8 != 0 || k % 8 != 0) {

@@ -6,27 +6,28 @@
 
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
-#include <hip/hip_bf16.h>
+#include <hip/hip_bf16.h>        // define __hip_bfloat16 type
+// #include <hip/hip_bfloat16.h> // define   hip_bfloat16 type
 
 #include <hipblas/hipblas.h>
 #include <hipblaslt/hipblaslt.h>
 #include <hipblaslt/hipblaslt-ext.hpp>
+#ifdef SPARSITY_ENABLED
+// #include <cusparseLt.h>
+#endif
+
 
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-#ifdef SPARSITY_ENABLED
-#include <cusparseLt.h>
-#endif
 
 namespace fastertransformer {
 namespace rocm {
 
 #define MAX_CONFIG_NUM 20
 #define COL32_ 32
-// workspace for cublas gemm : 32MB
-#define CUBLAS_WORKSPACE_SIZE 33554432
+#define HIPBLAS_WORKSPACE_SIZE 33554432 // 32MB
 
 template<typename T_OUT, typename T_IN> __host__ __device__ inline T_OUT special_cast(T_IN val) { return val; }
 template<> __host__ __device__ inline __hip_bfloat16 special_cast<__hip_bfloat16, float>(float val) { return __float2bfloat16(val); };
@@ -40,7 +41,7 @@ half4;
 
 /* **************************** type definition ***************************** */
 
-enum CublasDataType {
+enum HipblasDataType {
     FLOAT_DATATYPE    = 0,
     HALF_DATATYPE     = 1,
     BFLOAT16_DATATYPE = 2,
@@ -48,7 +49,7 @@ enum CublasDataType {
     FP8_DATATYPE      = 4
 };
 
-enum FtCudaDataType {
+enum FtHipDataType {
     FP32 = 0,
     FP16 = 1,
     BF16 = 2,
@@ -65,12 +66,12 @@ enum class OperationType {
 };
 
 /* **************************** debug tools ********************************* */
-static const char* _cudaGetErrorEnum(hipError_t error)
+static const char* _hipGetErrorEnum(hipError_t error)
 {
     return hipGetErrorString(error);
 }
 
-static const char* _cudaGetErrorEnum(hipblasStatus_t error)
+static const char* _hipGetErrorEnum(hipblasStatus_t error)
 {
     switch (error) {
         case HIPBLAS_STATUS_SUCCESS:
@@ -116,7 +117,7 @@ template<typename T>
 void check(T result, char const* const func, const char* const file, int const line)
 {
     if (result) {
-        throw std::runtime_error(std::string("[FT][ERROR] ROCM runtime error: ") + (_cudaGetErrorEnum(result)) + " "
+        throw std::runtime_error(std::string("[FT][ERROR] ROCM runtime error: ") + (_hipGetErrorEnum(result)) + " "
                                  + file + ":" + std::to_string(line) + " \n");
     }
 }
@@ -133,7 +134,7 @@ inline void syncAndCheck(const char* const file, int const line)
             check_hip_error(hipDeviceSynchronize());
             hipError_t result = hipGetLastError();
             if (result) {
-                throw std::runtime_error(std::string("[FT][ERROR] CUDA runtime error: ") + (_cudaGetErrorEnum(result))
+                throw std::runtime_error(std::string("[FT][ERROR] ROCM runtime error: ") + (_hipGetErrorEnum(result))
                                          + " " + file + ":" + std::to_string(line) + " \n");
             }
             FT_LOG_DEBUG(fmtstr("run syncAndCheck at %s:%d", file, line));
@@ -144,23 +145,13 @@ inline void syncAndCheck(const char* const file, int const line)
     check_hip_error(hipDeviceSynchronize());
     hipError_t result = hipGetLastError();
     if (result) {
-        throw std::runtime_error(std::string("[FT][ERROR] CUDA runtime error: ") + (_cudaGetErrorEnum(result)) + " "
+        throw std::runtime_error(std::string("[FT][ERROR] ROCM runtime error: ") + (_hipGetErrorEnum(result)) + " "
                                  + file + ":" + std::to_string(line) + " \n");
     }
 #endif
 }
 
-#define sync_check_cuda_error() syncAndCheck(__FILE__, __LINE__)
-
-#define checkCUDNN(expression)                                                                                         \
-    {                                                                                                                  \
-        hipdnnStatus_t status = (expression);                                                                           \
-        if (status != HIPDNN_STATUS_SUCCESS) {                                                                          \
-            std::cerr << "Error on file " << __FILE__ << " line " << __LINE__ << ": " << hipdnnGetErrorString(status)   \
-                      << std::endl;                                                                                    \
-            std::exit(EXIT_FAILURE);                                                                                   \
-        }                                                                                                              \
-    }
+#define sync_check_hip_error() syncAndCheck(__FILE__, __LINE__)
 
 template<typename T>
 void print_to_file(const T*           result,
@@ -202,27 +193,15 @@ void check_abs_mean_val(const T* result, const int size);
         }                                                                                                              \
     } while (0)
 
-#ifdef SPARSITY_ENABLED
-#define CHECK_CUSPARSE(func)                                                                                           \
-    {                                                                                                                  \
-        hipsparseStatus_t status = (func);                                                                              \
-        if (status != HIPSPARSE_STATUS_SUCCESS) {                                                                       \
-            throw std::runtime_error(std::string("[FT][ERROR] CUSPARSE API failed at line ")                           \
-                                     + std::to_string(__LINE__) + " in file " + __FILE__ + ": "                        \
-                                     + cusparseGetErrorString(status) + " " + std::to_string(status));                 \
-        }                                                                                                              \
-    }
-#endif
-
 /*************Time Handling**************/
-class CudaTimer {
+class HipTimer {
 private:
     hipEvent_t  event_start_;
     hipEvent_t  event_stop_;
     hipStream_t stream_;
 
 public:
-    explicit CudaTimer(hipStream_t stream = 0)
+    explicit HipTimer(hipStream_t stream = 0)
     {
         stream_ = stream;
     }
@@ -242,7 +221,7 @@ public:
         check_hip_error(hipEventDestroy(event_stop_));
         return time;
     }
-    ~CudaTimer() {}
+    ~HipTimer() {}
 };
 
 static double diffTime(timeval start, timeval end)
@@ -313,7 +292,7 @@ inline int getDeviceCount()
 }
 
 template<typename T>
-CublasDataType getCublasDataType()
+HipblasDataType getHipblasDataType()
 {
     if (std::is_same<T, half>::value) {
         return HALF_DATATYPE;
@@ -333,7 +312,7 @@ CublasDataType getCublasDataType()
 }
 
 template<typename T>
-hipblasDatatype_t getCudaDataType()
+hipblasDatatype_t getHipDataType()
 {
     if (std::is_same<T, half>::value) {
         return HIPBLAS_R_16F;
@@ -352,24 +331,24 @@ hipblasDatatype_t getCudaDataType()
     }
 }
 
-template<CublasDataType T>
-struct getTypeFromCudaDataType {
+template<HipblasDataType T>
+struct getTypeFromHipDataType {
     using Type = float;
 };
 
 template<>
-struct getTypeFromCudaDataType<HALF_DATATYPE> {
+struct getTypeFromHipDataType<HALF_DATATYPE> {
     using Type = half;
 };
 
 #if ENABLE_BF16
 template<>
-struct getTypeFromCudaDataType<BFLOAT16_DATATYPE> {
+struct getTypeFromHipDataType<BFLOAT16_DATATYPE> {
     using Type = hip_bfloat16;
 };
 #endif
 
-FtCudaDataType getModelFileType(std::string ini_file, std::string section_name);
+FtHipDataType getModelFileType(std::string ini_file, std::string section_name);
 
 // clang-format off
 template<typename T> struct packed_type;

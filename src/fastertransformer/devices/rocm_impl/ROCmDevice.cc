@@ -27,7 +27,7 @@ ROCmDevice::ROCmDevice(const DeviceInitParams& params): DeviceBase(params) {
     hipblasLtCreate(&hipblaslt_handle_);
     hipGetDeviceProperties(&device_prop_, device_id_);
 
-    hipblas_algo_map_.reset(new rocm::cublasAlgoMap());
+    hipblas_algo_map_.reset(new rocm::hipblasAlgoMap());
 
     hipblas_mm_wrapper_.reset(
        new hipblasMMWrapper(hipblas_handle_, 

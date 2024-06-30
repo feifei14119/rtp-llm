@@ -206,7 +206,7 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
                                             arguments.n,
                                             arguments.k,
                                             stream_);
-        sync_check_cuda_error();
+        sync_check_hip_error();
         return std::move(output);
     }
 #endif
@@ -247,7 +247,7 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
                                  arguments.lda,
                                  D,
                                  arguments.ldc);
-        rocm::sync_check_cuda_error();
+        rocm::sync_check_hip_error();
         return move(output);
     } else if (ROCmGemmDispatch::dispatch(params) == GemmImplementType::hipblas_batch_gemm) {
 
@@ -285,7 +285,7 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
                                                arguments.stride_c,
                                                arguments.batch_size,
                                                computeType);
-        rocm::sync_check_cuda_error();
+        rocm::sync_check_hip_error();
         return move(output);
     } else {
         throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);

@@ -284,7 +284,7 @@ void check_max_val(const T* result, const int size)
         }
     }
     delete tmp;
-    printf("[INFO][CUDA] addr %p max val: %f \n", result, max_val);
+    printf("[INFO][ROCM] addr %p max val: %f \n", result, max_val);
 }
 
 template void check_max_val(const float* result, const int size);
@@ -303,7 +303,7 @@ void check_abs_mean_val(const T* result, const int size)
         sum += abs(special_cast<float, T>(tmp[i]));
     }
     delete tmp;
-    printf("[INFO][CUDA] addr %p abs mean val: %f \n", result, sum / size);
+    printf("[INFO][ROCM] addr %p abs mean val: %f \n", result, sum / size);
 }
 
 template void check_abs_mean_val(const float* result, const int size);
@@ -345,28 +345,28 @@ hipError_t getSetDevice(int i_device, int* o_device)
     return hipSuccess;
 }
 
-FtCudaDataType getModelFileType(std::string ini_file, std::string section_name)
+FtHipDataType getModelFileType(std::string ini_file, std::string section_name)
 {
-    FtCudaDataType model_file_type;
+    FtHipDataType model_file_type;
     INIReader      reader = INIReader(ini_file);
     if (reader.ParseError() < 0) {
         FT_LOG_WARNING("Can't load %s. Use FP32 as default", ini_file.c_str());
-        model_file_type = FtCudaDataType::FP32;
+        model_file_type = FtHipDataType::FP32;
     }
     else {
         std::string weight_data_type_str = std::string(reader.Get(section_name, "weight_data_type"));
         if (weight_data_type_str.find("fp32") != std::string::npos) {
-            model_file_type = FtCudaDataType::FP32;
+            model_file_type = FtHipDataType::FP32;
         }
         else if (weight_data_type_str.find("fp16") != std::string::npos) {
-            model_file_type = FtCudaDataType::FP16;
+            model_file_type = FtHipDataType::FP16;
         }
         else if (weight_data_type_str.find("bf16") != std::string::npos) {
-            model_file_type = FtCudaDataType::BF16;
+            model_file_type = FtHipDataType::BF16;
         }
         else {
             FT_LOG_WARNING("Invalid type %s. Use FP32 as default", weight_data_type_str.c_str());
-            model_file_type = FtCudaDataType::FP32;
+            model_file_type = FtHipDataType::FP32;
         }
     }
     return model_file_type;

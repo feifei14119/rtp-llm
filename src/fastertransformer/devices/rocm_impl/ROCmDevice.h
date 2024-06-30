@@ -39,7 +39,7 @@ private:
     hipblasHandle_t hipblas_handle_;
     hipblasLtHandle_t hipblaslt_handle_;
 
-    std::unique_ptr<rocm::cublasAlgoMap> hipblas_algo_map_;
+    std::unique_ptr<rocm::hipblasAlgoMap> hipblas_algo_map_;
     std::unique_ptr<hipblasMMWrapper> hipblas_mm_wrapper_;
 };
 
