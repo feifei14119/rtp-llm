@@ -222,7 +222,6 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
                                             HIPBLAS_R_32F);
     } else {
         hipblasMMWrapperPtr()->setGemmConfig(A_data_type,
-
                                             B_data_type,
                                             D_data_type,
                                             dtypeConvert(params.compute_type));
@@ -235,8 +234,8 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
         auto D = output->data();
         auto a_op = opConvert(params.transA);
         auto b_op = opConvert(params.transB);
-        hipblas_mm_wrapper_->Gemm(b_op,
 
+        hipblas_mm_wrapper_->Gemm(b_op,
                                  a_op,
                                  arguments.n,
                                  arguments.m,
@@ -263,8 +262,8 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
         auto B_data_type = dtypeConvert(arguments.BDtype);
         auto D_data_type = dtypeConvert(arguments.DDtype);
         auto computeType = dtypeConvert(arguments.DDtype);
-        hipblas_mm_wrapper_->stridedBatchedGemm(b_op,
 
+        hipblas_mm_wrapper_->stridedBatchedGemm(b_op,
                                                a_op,
                                                arguments.n,
                                                arguments.m,

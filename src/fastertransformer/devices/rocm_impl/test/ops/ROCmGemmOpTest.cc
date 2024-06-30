@@ -21,8 +21,7 @@ TEST_F(ROCmGemmOpTest, BasicGemmOpTest) {
     // BasicQGemmOpTest(2, 2048, 4096, DataType::TYPE_FP16);
 }
 
-#if 0
-TEST_F(CudaGemmOpTest, TransposeGemmOpTest) {
+TEST_F(ROCmGemmOpTest, TransposeGemmOpTest) {
     auto tran = TransposeOperation::TRANSPOSE;
     auto none = TransposeOperation::NONE;
     size_t m = 5;
@@ -38,7 +37,7 @@ TEST_F(CudaGemmOpTest, TransposeGemmOpTest) {
     TransposeGemmOpTest(tran, none, k, m, k, n, DataType::TYPE_FP32);
 }
 
-TEST_F(CudaGemmOpTest, BatchGemmOpTest) {
+TEST_F(ROCmGemmOpTest, BatchGemmOpTest) {
     BatchGemmOpTest(1, 8, 16, 32, DataType::TYPE_FP16, 1e-2, 1e-2);
     BatchGemmOpTest(2, 8, 16, 32, DataType::TYPE_FP16, 1e-2, 1e-2);
     BatchGemmOpTest(4, 8, 16, 32, DataType::TYPE_FP16, 1e-2, 1e-2);
@@ -49,24 +48,24 @@ TEST_F(CudaGemmOpTest, BatchGemmOpTest) {
     BatchGemmOpTest(8, 8, 8, 8, DataType::TYPE_FP32);
 }
 
-TEST_F(CudaGemmOpTest, TransposeBatchGemmOpTest) {
+TEST_F(ROCmGemmOpTest, TransposeBatchGemmOpTest) {
     auto tran = TransposeOperation::TRANSPOSE;
     auto none = TransposeOperation::NONE;
     size_t b = 128;
     size_t m = 64;
     size_t n = 8;
     size_t k = 16;
-    BatchTransposeGemmOp(none, none, b, m, k, k, n, DataType::TYPE_FP16);
-    BatchTransposeGemmOp(none, tran, b, m, k, n, k, DataType::TYPE_FP16);
-    BatchTransposeGemmOp(tran, tran, b, k, m, n, k, DataType::TYPE_FP16);
-    BatchTransposeGemmOp(tran, none, b, k, m, k, n, DataType::TYPE_FP16);
+    BatchTransposeGemmOp(none, none, b, m, k, k, n, DataType::TYPE_FP16, 1e-2, 1e-2);
+    BatchTransposeGemmOp(none, tran, b, m, k, n, k, DataType::TYPE_FP16, 1e-2, 1e-2);
+    BatchTransposeGemmOp(tran, tran, b, k, m, n, k, DataType::TYPE_FP16, 1e-2, 1e-2);
+    BatchTransposeGemmOp(tran, none, b, k, m, k, n, DataType::TYPE_FP16, 1e-2, 1e-2);
     BatchTransposeGemmOp(none, none, b, m, k, k, n, DataType::TYPE_FP32);
     BatchTransposeGemmOp(none, tran, b, m, k, n, k, DataType::TYPE_FP32);
     BatchTransposeGemmOp(tran, tran, b, k, m, n, k, DataType::TYPE_FP32);
     BatchTransposeGemmOp(tran, none, b, k, m, k, n, DataType::TYPE_FP32);
 }
 
-TEST_F(CudaGemmOpTest, TransposeBatchMixFloatGemmOP) {
+TEST_F(ROCmGemmOpTest, TransposeBatchMixFloatGemmOP) {
     auto tran = TransposeOperation::TRANSPOSE;
     auto none = TransposeOperation::NONE;
     size_t b = 128;
@@ -82,5 +81,3 @@ TEST_F(CudaGemmOpTest, TransposeBatchMixFloatGemmOP) {
     MixtureBatchTransposeGemmOp(tran, tran, b, k, m, n, k, DataType::TYPE_FP32, DataType::TYPE_FP32);
     MixtureBatchTransposeGemmOp(tran, none, b, k, m, k, n, DataType::TYPE_FP32, DataType::TYPE_FP32);
 }
-#endif
-
