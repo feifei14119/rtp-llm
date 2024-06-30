@@ -1,15 +1,17 @@
 #pragma once
 
-//#include "3rdparty/INIReader.h"
-//#include "amd_hip_bf16_new.h"
-#include "hip_bf16_wrapper.h"
+#include "INIReader.h"
 #include "src/fastertransformer/utils/logger.h"
 #include "src/fastertransformer/utils/assert_utils.h"
 
-#include <hip/hip_fp16.h>
-#include <hipblaslt/hipblaslt.h>
-#include <hipblas/hipblas.h>
 #include <hip/hip_runtime.h>
+#include <hip/hip_fp16.h>
+#include <hip/hip_bf16.h>
+
+#include <hipblas/hipblas.h>
+#include <hipblaslt/hipblaslt.h>
+#include <hipblaslt/hipblaslt-ext.hpp>
+
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -25,6 +27,10 @@ namespace rocm {
 #define COL32_ 32
 // workspace for cublas gemm : 32MB
 #define CUBLAS_WORKSPACE_SIZE 33554432
+
+template<typename T_OUT, typename T_IN> __host__ __device__ inline T_OUT special_cast(T_IN val) { return val; }
+template<> __host__ __device__ inline __hip_bfloat16 special_cast<__hip_bfloat16, float>(float val) { return __float2bfloat16(val); };
+template<> __host__ __device__ inline float special_cast<float, __hip_bfloat16>(__hip_bfloat16 val) { return __bfloat162float(val); };
 
 typedef struct
 {
@@ -96,6 +102,12 @@ static const char* _cudaGetErrorEnum(hipblasStatus_t error)
 
         case HIPBLAS_STATUS_UNKNOWN:
             return "CUBLAS_STATUS_LICENSE_ERROR";
+
+        case HIPBLAS_STATUS_HANDLE_IS_NULLPTR:
+            return "HIPBLAS_STATUS_HANDLE_IS_NULLPTR";
+
+        case HIPBLAS_STATUS_INVALID_ENUM:
+            return "HIPBLAS_STATUS_INVALID_ENUM";
     }
     return "<unknown>";
 }
@@ -104,13 +116,12 @@ template<typename T>
 void check(T result, char const* const func, const char* const file, int const line)
 {
     if (result) {
-        throw std::runtime_error(std::string("[FT][ERROR] CUDA runtime error: ") + (_cudaGetErrorEnum(result)) + " "
+        throw std::runtime_error(std::string("[FT][ERROR] ROCM runtime error: ") + (_cudaGetErrorEnum(result)) + " "
                                  + file + ":" + std::to_string(line) + " \n");
     }
 }
 
-#define check_cuda_error(val) check((val), #val, __FILE__, __LINE__)
-#define check_cuda_error_2(val, file, line) check((val), #val, file, line)
+#define check_hip_error(val) check((val), #val, __FILE__, __LINE__)
 
 inline void syncAndCheck(const char* const file, int const line)
 {
@@ -119,7 +130,7 @@ inline void syncAndCheck(const char* const file, int const line)
     if (level_name != nullptr) {
         static std::string level = std::string(level_name);
         if (level == "DEBUG") {
-            hipDeviceSynchronize();
+            check_hip_error(hipDeviceSynchronize());
             hipError_t result = hipGetLastError();
             if (result) {
                 throw std::runtime_error(std::string("[FT][ERROR] CUDA runtime error: ") + (_cudaGetErrorEnum(result))
@@ -130,7 +141,7 @@ inline void syncAndCheck(const char* const file, int const line)
     }
 
 #ifndef NDEBUG
-    hipDeviceSynchronize();
+    check_hip_error(hipDeviceSynchronize());
     hipError_t result = hipGetLastError();
     if (result) {
         throw std::runtime_error(std::string("[FT][ERROR] CUDA runtime error: ") + (_cudaGetErrorEnum(result)) + " "
@@ -217,18 +228,18 @@ public:
     }
     void start()
     {
-        check_cuda_error(hipEventCreate(&event_start_));
-        check_cuda_error(hipEventCreate(&event_stop_));
-        check_cuda_error(hipEventRecord(event_start_, stream_));
+        check_hip_error(hipEventCreate(&event_start_));
+        check_hip_error(hipEventCreate(&event_stop_));
+        check_hip_error(hipEventRecord(event_start_, stream_));
     }
     float stop()
     {
         float time;
-        check_cuda_error(hipEventRecord(event_stop_, stream_));
-        check_cuda_error(hipEventSynchronize(event_stop_));
-        check_cuda_error(hipEventElapsedTime(&time, event_start_, event_stop_));
-        check_cuda_error(hipEventDestroy(event_start_));
-        check_cuda_error(hipEventDestroy(event_stop_));
+        check_hip_error(hipEventRecord(event_stop_, stream_));
+        check_hip_error(hipEventSynchronize(event_stop_));
+        check_hip_error(hipEventElapsedTime(&time, event_start_, event_stop_));
+        check_hip_error(hipEventDestroy(event_start_));
+        check_hip_error(hipEventDestroy(event_stop_));
         return time;
     }
     ~CudaTimer() {}
@@ -244,7 +255,7 @@ static double diffTime(timeval start, timeval end)
 inline void print_mem_usage(std::string time = "after allocation")
 {
     size_t free_bytes, total_bytes;
-    check_cuda_error(hipMemGetInfo(&free_bytes, &total_bytes));
+    check_hip_error(hipMemGetInfo(&free_bytes, &total_bytes));
     float free  = static_cast<float>(free_bytes) / 1024.0 / 1024.0 / 1024.0;
     float total = static_cast<float>(total_bytes) / 1024.0 / 1024.0 / 1024.0;
     float used  = total - free;
@@ -254,29 +265,29 @@ inline void print_mem_usage(std::string time = "after allocation")
 inline int getSMVersion()
 {
     int device{-1};
-    check_cuda_error(hipGetDevice(&device));
+    check_hip_error(hipGetDevice(&device));
     int sm_major = 0;
     int sm_minor = 0;
-    check_cuda_error(hipDeviceGetAttribute(&sm_major, hipDeviceAttributeComputeCapabilityMajor, device));
-    check_cuda_error(hipDeviceGetAttribute(&sm_minor, hipDeviceAttributeComputeCapabilityMinor, device));
+    check_hip_error(hipDeviceGetAttribute(&sm_major, hipDeviceAttributeComputeCapabilityMajor, device));
+    check_hip_error(hipDeviceGetAttribute(&sm_minor, hipDeviceAttributeComputeCapabilityMinor, device));
     return sm_major * 10 + sm_minor;
 }
 
 inline int getMaxSharedMemoryPerBlock()
 {
     int device{-1};
-    check_cuda_error(hipGetDevice(&device));
+    check_hip_error(hipGetDevice(&device));
     int max_shared_memory_size = 0;
-    check_cuda_error(hipDeviceGetAttribute(&max_shared_memory_size, hipDeviceAttributeMaxSharedMemoryPerBlock, device));
+    check_hip_error(hipDeviceGetAttribute(&max_shared_memory_size, hipDeviceAttributeMaxSharedMemoryPerBlock, device));
     return max_shared_memory_size;
 }
 
 inline std::string getDeviceName()
 {
     int device{-1};
-    check_cuda_error(hipGetDevice(&device));
+    check_hip_error(hipGetDevice(&device));
     hipDeviceProp_t props;
-    check_cuda_error(hipGetDeviceProperties(&props, device));
+    check_hip_error(hipGetDeviceProperties(&props, device));
     return std::string(props.name);
 }
 
@@ -290,14 +301,14 @@ hipError_t getSetDevice(int i_device, int* o_device = NULL);
 inline int getDevice()
 {
     int current_dev_id = 0;
-    check_cuda_error(hipGetDevice(&current_dev_id));
+    check_hip_error(hipGetDevice(&current_dev_id));
     return current_dev_id;
 }
 
 inline int getDeviceCount()
 {
     int count = 0;
-    check_cuda_error(hipGetDeviceCount(&count));
+    check_hip_error(hipGetDeviceCount(&count));
     return count;
 }
 
@@ -405,8 +416,8 @@ void compareTwoTensor(
 {
     T1* h_pred = new T1[size];
     T2* h_ref  = new T2[size];
-    check_cuda_error(hipMemcpy(h_pred, pred, size * sizeof(T1), hipMemcpyDeviceToHost));
-    check_cuda_error(hipMemcpy(h_ref, ref, size * sizeof(T2), hipMemcpyDeviceToHost));
+    check_hip_error(hipMemcpy(h_pred, pred, size * sizeof(T1), hipMemcpyDeviceToHost));
+    check_hip_error(hipMemcpy(h_ref, ref, size * sizeof(T2), hipMemcpyDeviceToHost));
 
     FILE* fd = nullptr;
     if (filename != "") {

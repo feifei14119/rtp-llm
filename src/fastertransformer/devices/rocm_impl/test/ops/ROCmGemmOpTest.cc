@@ -8,14 +8,6 @@ using namespace fastertransformer;
 class ROCmGemmOpTest: public GemmOpTest {};
 
 TEST_F(ROCmGemmOpTest, BasicGemmOpTest) {
-    BasicGemmOpTest(2, 1024, 2048, DataType::TYPE_FP32);
-    BasicGemmOpTest(8, 1024, 2048, DataType::TYPE_FP32);
-    BasicGemmOpTest(1024, 1024, 2048, DataType::TYPE_FP32);
-    BasicGemmOpTest(4096, 1024, 2048, DataType::TYPE_FP32);
-}
-
-#if 0
-TEST_F(ROCmGemmOpTest, BasicGemmOpTest) {
     BasicGemmOpTest(2, 1024, 2048, DataType::TYPE_FP16);
     BasicGemmOpTest(8, 1024, 2048, DataType::TYPE_FP16);
     BasicGemmOpTest(1024, 1024, 2048, DataType::TYPE_FP16);
@@ -24,11 +16,12 @@ TEST_F(ROCmGemmOpTest, BasicGemmOpTest) {
     BasicGemmOpTest(8, 1024, 2048, DataType::TYPE_FP32);
     BasicGemmOpTest(1024, 1024, 2048, DataType::TYPE_FP32);
     BasicGemmOpTest(4096, 1024, 2048, DataType::TYPE_FP32);
-    BasicQGemmOpTest(64, 64, 64, DataType::TYPE_FP16);
-    BasicQGemmOpTest(2, 1024, 2048, DataType::TYPE_FP16);
-    BasicQGemmOpTest(2, 2048, 4096, DataType::TYPE_FP16);
+    // BasicQGemmOpTest(64, 64, 64, DataType::TYPE_FP16);
+    // BasicQGemmOpTest(2, 1024, 2048, DataType::TYPE_FP16);
+    // BasicQGemmOpTest(2, 2048, 4096, DataType::TYPE_FP16);
 }
 
+#if 0
 TEST_F(CudaGemmOpTest, TransposeGemmOpTest) {
     auto tran = TransposeOperation::TRANSPOSE;
     auto none = TransposeOperation::NONE;

@@ -1,6 +1,4 @@
-#include <hip/hip_runtime.h>
 #include "hip_utils.h"
-#include "INIReader.h"
 
 namespace fastertransformer {
 namespace rocm {
@@ -10,13 +8,13 @@ namespace rocm {
 template<typename T>
 void print_to_file(const T* result, const int size, const char* file, hipStream_t stream, std::ios::openmode open_mode)
 {
-    hipDeviceSynchronize();
-    check_cuda_error(hipGetLastError());
+    check_hip_error(hipDeviceSynchronize());
+    check_hip_error(hipGetLastError());
     printf("[INFO] file: %s with size %d.\n", file, size);
     std::ofstream outFile(file, open_mode);
     if (outFile) {
         T* tmp = new T[size];
-        check_cuda_error(hipMemcpyAsync(tmp, result, sizeof(T) * size, hipMemcpyDeviceToHost, stream));
+        check_hip_error(hipMemcpyAsync(tmp, result, sizeof(T) * size, hipMemcpyDeviceToHost, stream));
         for (int i = 0; i < size; ++i) {
             float val = special_cast<float, T>(tmp[i]);
             outFile << val << std::endl;
@@ -26,8 +24,8 @@ void print_to_file(const T* result, const int size, const char* file, hipStream_
     else {
         throw std::runtime_error(std::string("[FT][ERROR] Cannot open file: ") + file + "\n");
     }
-    hipDeviceSynchronize();
-    check_cuda_error(hipGetLastError());
+    check_hip_error(hipDeviceSynchronize());
+    check_hip_error(hipGetLastError());
 }
 
 template void
@@ -46,12 +44,12 @@ void print_abs_mean(const T* buf, uint size, hipStream_t stream, std::string nam
         FT_LOG_WARNING("It is an nullptr, skip!");
         return;
     }
-    hipDeviceSynchronize();
-    check_cuda_error(hipGetLastError());
+    check_hip_error(hipDeviceSynchronize());
+    check_hip_error(hipGetLastError());
     T* h_tmp = new T[size];
-    hipMemcpyAsync(h_tmp, buf, sizeof(T) * size, hipMemcpyDeviceToHost, stream);
-    hipDeviceSynchronize();
-    check_cuda_error(hipGetLastError());
+    check_hip_error(hipMemcpyAsync(h_tmp, buf, sizeof(T) * size, hipMemcpyDeviceToHost, stream));
+    check_hip_error(hipDeviceSynchronize());
+    check_hip_error(hipGetLastError());
     double   sum        = 0.0f;
     uint64_t zero_count = 0;
     float    max_val    = -1e10;
@@ -76,8 +74,8 @@ void print_abs_mean(const T* buf, uint size, hipStream_t stream, std::string nam
            find_inf ? "true" : "false");
     std::cout << std::endl;
     delete[] h_tmp;
-    hipDeviceSynchronize();
-    check_cuda_error(hipGetLastError());
+    check_hip_error(hipDeviceSynchronize());
+    check_hip_error(hipGetLastError());
 }
 
 template void print_abs_mean(const float* buf, uint size, hipStream_t stream, std::string name);
@@ -100,7 +98,7 @@ void print_to_screen(const T* result, const int size)
         return;
     }
     T* tmp = reinterpret_cast<T*>(malloc(sizeof(T) * size));
-    check_cuda_error(hipMemcpy(tmp, result, sizeof(T) * size, hipMemcpyDeviceToHost));
+    check_hip_error(hipMemcpy(tmp, result, sizeof(T) * size, hipMemcpyDeviceToHost));
     for (int i = 0; i < size; ++i) {
         printf("%d, %f\n", i, special_cast<float, T>(tmp[i]));
     }
@@ -126,8 +124,8 @@ void printMatrix(T* ptr, int m, int k, int stride, bool is_device_ptr)
     if (is_device_ptr) {
         // k < stride ; stride = col-dimension.
         tmp = reinterpret_cast<T*>(malloc(m * stride * sizeof(T)));
-        check_cuda_error(hipMemcpy(tmp, ptr, sizeof(T) * m * stride, hipMemcpyDeviceToHost));
-        hipDeviceSynchronize();
+        check_hip_error(hipMemcpy(tmp, ptr, sizeof(T) * m * stride, hipMemcpyDeviceToHost));
+        check_hip_error(hipDeviceSynchronize());
     }
     else {
         tmp = ptr;
@@ -169,8 +167,8 @@ void printMatrix(unsigned long long* ptr, int m, int k, int stride, bool is_devi
     if (is_device_ptr) {
         // k < stride ; stride = col-dimension.
         tmp = reinterpret_cast<T*>(malloc(m * stride * sizeof(T)));
-        check_cuda_error(hipMemcpy(tmp, ptr, sizeof(T) * m * stride, hipMemcpyDeviceToHost));
-        hipDeviceSynchronize();
+        check_hip_error(hipMemcpy(tmp, ptr, sizeof(T) * m * stride, hipMemcpyDeviceToHost));
+        check_hip_error(hipDeviceSynchronize());
     }
     else {
         tmp = ptr;
@@ -206,8 +204,8 @@ void printMatrix(int* ptr, int m, int k, int stride, bool is_device_ptr)
     if (is_device_ptr) {
         // k < stride ; stride = col-dimension.
         tmp = reinterpret_cast<T*>(malloc(m * stride * sizeof(T)));
-        check_cuda_error(hipMemcpy(tmp, ptr, sizeof(T) * m * stride, hipMemcpyDeviceToHost));
-        hipDeviceSynchronize();
+        check_hip_error(hipMemcpy(tmp, ptr, sizeof(T) * m * stride, hipMemcpyDeviceToHost));
+        check_hip_error(hipDeviceSynchronize());
     }
     else {
         tmp = ptr;
@@ -243,8 +241,8 @@ void printMatrix(size_t* ptr, int m, int k, int stride, bool is_device_ptr)
     if (is_device_ptr) {
         // k < stride ; stride = col-dimension.
         tmp = reinterpret_cast<T*>(malloc(m * stride * sizeof(T)));
-        check_cuda_error(hipMemcpy(tmp, ptr, sizeof(T) * m * stride, hipMemcpyDeviceToHost));
-        hipDeviceSynchronize();
+        check_hip_error(hipMemcpy(tmp, ptr, sizeof(T) * m * stride, hipMemcpyDeviceToHost));
+        check_hip_error(hipDeviceSynchronize());
     }
     else {
         tmp = ptr;
@@ -277,7 +275,7 @@ template<typename T>
 void check_max_val(const T* result, const int size)
 {
     T* tmp = new T[size];
-    hipMemcpy(tmp, result, sizeof(T) * size, hipMemcpyDeviceToHost);
+    check_hip_error(hipMemcpy(tmp, result, sizeof(T) * size, hipMemcpyDeviceToHost));
     float max_val = -100000;
     for (int i = 0; i < size; i++) {
         float val = special_cast<float, T>(tmp[i]);
@@ -299,7 +297,7 @@ template<typename T>
 void check_abs_mean_val(const T* result, const int size)
 {
     T* tmp = new T[size];
-    hipMemcpy(tmp, result, sizeof(T) * size, hipMemcpyDeviceToHost);
+    check_hip_error(hipMemcpy(tmp, result, sizeof(T) * size, hipMemcpyDeviceToHost));
     float sum = 0.0f;
     for (int i = 0; i < size; i++) {
         sum += abs(special_cast<float, T>(tmp[i]));

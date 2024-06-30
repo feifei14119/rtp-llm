@@ -303,7 +303,7 @@ cc_library(
         "cuda_bf16_fallbacks.cuh",
     ],
     deps = [
-        "//src/fastertransformer/rocm:cuda_shims",
+        #"//src/fastertransformer/rocm:cuda_shims",
         "//src/fastertransformer/core:tensor_hdr",
     ],
     copts = copts(),

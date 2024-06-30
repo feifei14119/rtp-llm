@@ -14,7 +14,7 @@ cc_library(
         "//src/fastertransformer/core:allocator",
         "@local_config_rocm//rocm:rocm_headers",
         "@local_config_rocm//rocm:rocblas",
-        "//src/fastertransformer/kernels:gpt_kernels_rocm",
+        #"//src/fastertransformer/kernels:gpt_kernels_rocm",
         "//src/fastertransformer/rocm:rocm_utils",
     ],
     visibility = ["//visibility:public"],

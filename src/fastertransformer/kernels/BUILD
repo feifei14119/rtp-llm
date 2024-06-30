@@ -78,7 +78,7 @@ cc_library(
     deps = [
         "@local_config_rocm//rocm:rocm_headers",
         "@local_config_rocm//rocm:hip",
-        "//src/fastertransformer/cuda:cuda_utils_rocm",
+        #"//src/fastertransformer/cuda:cuda_utils_rocm",
         "//src/fastertransformer/utils:utils",
     ],
     copts = rocm_copts(),
