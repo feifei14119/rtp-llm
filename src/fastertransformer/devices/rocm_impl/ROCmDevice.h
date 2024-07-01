@@ -28,7 +28,7 @@ public:
     AttentionModuleOutput contextAttention(const AttentionModuleParams& params) override;
 
 public:
-    hipblasMMWrapper* hipblasMMWrapperPtr() const {return hipblas_mm_wrapper_.get();}
+    rocm::hipblasMMWrapper* hipblasMMWrapperPtr() const {return hipblas_mm_wrapper_.get();}
 
 private:
     hipDeviceProp_t device_prop_;
@@ -40,7 +40,7 @@ private:
     hipblasLtHandle_t hipblaslt_handle_;
 
     std::unique_ptr<rocm::hipblasAlgoMap> hipblas_algo_map_;
-    std::unique_ptr<hipblasMMWrapper> hipblas_mm_wrapper_;
+    std::unique_ptr<rocm::hipblasMMWrapper> hipblas_mm_wrapper_;
 };
 
 } // namespace fastertransformer
