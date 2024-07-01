@@ -54,7 +54,7 @@ cc_library(
 
 cc_library(
     name="ck_mha_lib",
-    srcs=glob(["ck_build/fmha_*wd*.cpp"]),
+    srcs=glob(["ck_bd/fmha_*wd*.cpp"]),
     hdrs=glob(["composable_kernel/**/*.hpp"]),
 
     copts=rocm_copts() + [
