@@ -61,9 +61,9 @@ bool rocmFmhaWrapper::runCKFmha(void*  q,
         is_v_rowmajor,
         mask.type,
         bias.type,
-        softmax_lse_ ? true : false,
-        false,  // 0~1 probability of dropout
-        false   // only fp8 will default use squant
+        softmax_lse_ ? true : false,  // bool has_lse;
+        // false,                        // 0~1 probability of dropout
+        false                         // do_fp8_static_quant; only fp8 will default use squant
     };
 
     auto fmha_args = [&, k_paddings_ = seqlen_kpads]() {
@@ -105,56 +105,65 @@ bool rocmFmhaWrapper::runCKFmha(void*  q,
         const ck_tile::index_t batch_stride_lse     = (nhead * max_seqlen_q);
         const ck_tile::index_t batch_stride_o       = (nhead * shape_seqlen_q * hdim_v);
 
-        return fmha_fwd_args{q,
-                             k,
-                             v,
-                             bias.type == bias_enum::alibi ? linear_bias_slopes : biasBuffer,
-                             nullptr,  // randval_buf.GetDeviceBuffer(),
-                             softmax_lse_,
-                             output,
-                             seqstart_q.GetDeviceBuffer(),
-                             seqstart_k.GetDeviceBuffer(),
-                             k_paddings_[0] < 0 ? nullptr : seqlen_k_buf.GetDeviceBuffer(),
-                             shape_seqlen_q,
-                             shape_seqlen_k,
-                             {static_cast<ck_tile::index_t>(batch_size)},
-                             max_seqlen_q,
-                             hdim_q,
-                             hdim_v,
-                             nhead,
-                             {static_cast<ck_tile::index_t>(kv_head_num_)},
-                             scale_s,
-                             scale_p,
-                             scale_o,
-                             stride_q,
-                             stride_k,
-                             stride_v,
-                             bias.type == bias_enum::alibi ? (bias.rank_info == 0 ? 0 : nhead) : stride_bias,
-                             stride_randval,
-                             stride_o,
-                             nhead_stride_q,
-                             nhead_stride_k,
-                             nhead_stride_v,
-                             nhead_stride_bias,
-                             nhead_stride_randval,
-                             nhead_stride_lse,
-                             nhead_stride_o,
-                             batch_stride_q,
-                             batch_stride_k,
-                             batch_stride_v,
-                             batch_stride_bias,
-                             batch_stride_randval,
-                             batch_stride_lse,
-                             batch_stride_o,
-                             mask.left,
-                             mask.right,
-                             static_cast<ck_tile::index_t>(mask.type),
-                             p_drop,
-                             s_randval,
-                             {1, 0}};  //{drop_seed, drop_offset}};
+        return fmha_fwd_args{
+            q,
+            k,
+            v,
+            bias.type == bias_enum::alibi ? linear_bias_slopes : biasBuffer,
+            // nullptr,  // randval_buf.GetDeviceBuffer(),
+            softmax_lse_,
+            output,
+            seqstart_q.GetDeviceBuffer(),
+            seqstart_k.GetDeviceBuffer(),
+            k_paddings_[0] < 0 ? nullptr : seqlen_k_buf.GetDeviceBuffer(),
+            shape_seqlen_q,
+            shape_seqlen_k,
+            {static_cast<ck_tile::index_t>(batch_size)},
+            max_seqlen_q,
+            hdim_q,
+            hdim_v,
+            nhead,
+            {static_cast<ck_tile::index_t>(kv_head_num_)},
+            scale_s,
+            scale_p,
+            scale_o,
+            stride_q,
+            stride_k,
+            stride_v,
+            bias.type == bias_enum::alibi ? (bias.rank_info == 0 ? 0 : nhead) : stride_bias,
+            //  stride_randval,
+            stride_o,
+            nhead_stride_q,
+            nhead_stride_k,
+            nhead_stride_v,
+            nhead_stride_bias,
+            //  nhead_stride_randval,
+            nhead_stride_lse,
+            nhead_stride_o,
+            batch_stride_q,
+            batch_stride_k,
+            batch_stride_v,
+            batch_stride_bias,
+            //  batch_stride_randval,
+            batch_stride_lse,
+            batch_stride_o,
+            mask.left,
+            mask.right,
+            static_cast<ck_tile::index_t>(mask.type),
+            // p_drop,
+            // s_randval,
+            // {1, 0}  //{drop_seed, drop_offset}};
+        };  
     }();
 
-    ck_tile::stream_config stream_config{nullptr, false, 0, 0, 0, false};
+    ck_tile::stream_config stream_config{
+        nullptr,  // stream_id_
+        false,    // time_kernel_
+        0,        // log_level_
+        0,        // cold_niters_
+        0,        // nrepeat_
+        // false     // 
+    };
 
     float run_time = fmha_fwd(fmha_traits, fmha_args, stream_config);
     if (run_time > 0) {
