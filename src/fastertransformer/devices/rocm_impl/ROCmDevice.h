@@ -30,7 +30,7 @@ public:
     AttentionModuleOutput contextAttention(const AttentionModuleParams& params) override;
 
 public:
-    hipblasMMWrapper* hipblasMMWrapperPtr() const {return hipblas_mm_wrapper_.get();}
+    rocm::hipblasMMWrapper* hipblasMMWrapperPtr() const {return hipblas_mm_wrapper_.get();}
 
 private:
     hipDeviceProp_t device_prop_;

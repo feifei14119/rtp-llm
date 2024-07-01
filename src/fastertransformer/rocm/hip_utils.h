@@ -215,7 +215,7 @@ inline void syncAndCheck(const char* const file, int const line)
 #endif
 }
 
-#define sync_check_hip_error() syncAndCheck(__FILE__, __LINE__)
+#define sync_check_hip_error() rocm::syncAndCheck(__FILE__, __LINE__)
 
 template<typename T>
 void print_to_file(const T*           result,

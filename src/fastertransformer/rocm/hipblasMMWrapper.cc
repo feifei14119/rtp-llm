@@ -1,7 +1,7 @@
 #include "hipblasMMWrapper.h"
 
 namespace fastertransformer {
-using namespace rocm;
+namespace rocm {
 
 hipblasMMWrapper::hipblasMMWrapper(hipblasHandle_t   cublas_handle,
                                  hipblasLtHandle_t cublaslt_handle,
@@ -16,14 +16,10 @@ hipblasMMWrapper::hipblasMMWrapper(hipblasHandle_t   cublas_handle,
     mu_(mu),
     allocator_(allocator)
 {
-//    printf("\n------------hipblasMMWrapper 1 -----------------\n");
 //    //FT_LOG_DEBUG(__PRETTY_FUNCTION__);
-//    printf("\n------------hipblasMMWrapper 2 -----------------\n");
 //    if (allocator_ != nullptr) {
-//    printf("\n------------hipblasMMWrapper 3 -----------------\n");
 //        cublas_workspace_ = allocator_->reMalloc(cublas_workspace_, HIPBLAS_WORKSPACE_SIZE);
 //    }
-//    printf("\n------------hipblasMMWrapper 4 -----------------\n");
 }
 
 #ifdef SPARSITY_ENABLED
@@ -1060,4 +1056,5 @@ void hipblasMMWrapper::Int8Gemm(const int     m,
     return _Int8Gemm(m, n, k, A, lda, B, ldb, C, ldc, (float*)nullptr, 1, false);
 }
 
+}  // namespace rocm
 }  // namespace fastertransformer

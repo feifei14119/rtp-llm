@@ -9,6 +9,7 @@
 #include <string>
 
 namespace fastertransformer {
+namespace rocm {
 
 class hipblasMMWrapper {
 
@@ -241,4 +242,5 @@ public:
 #endif
 
 };
+}  // namespace rocm
 }  // namespace fastertransformer

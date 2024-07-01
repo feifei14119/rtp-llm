@@ -14,6 +14,7 @@ extern "C" half __truncdfhf2(double a) {
 #endif
 
 namespace fastertransformer {
+using namespace rocm;
 
 ROCmDevice::ROCmDevice(const DeviceInitParams& params): DeviceBase(params) {
     RUNTIME_ASSERT_OP_ARG(params.tp_rank == 0, "rocm device doesn't support nccl");
@@ -27,7 +28,7 @@ ROCmDevice::ROCmDevice(const DeviceInitParams& params): DeviceBase(params) {
     hipblasLtCreate(&hipblaslt_handle_);
     hipGetDeviceProperties(&device_prop_, device_id_);
 
-    hipblas_algo_map_.reset(new rocm::hipblasAlgoMap());
+    hipblas_algo_map_.reset(new hipblasAlgoMap());
 
     hipblas_mm_wrapper_.reset(
        new hipblasMMWrapper(hipblas_handle_, 
