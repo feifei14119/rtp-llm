@@ -42,7 +42,7 @@ private:
     hipblasLtHandle_t hipblaslt_handle_;
 
     std::unique_ptr<rocm::hipblasAlgoMap> hipblas_algo_map_;
-    std::unique_ptr<hipblasMMWrapper> hipblas_mm_wrapper_;
+    std::unique_ptr<rocm::hipblasMMWrapper> hipblas_mm_wrapper_;
     std::unique_ptr<rocmFmhaWrapper>      fmha_runner_;
 };
 
