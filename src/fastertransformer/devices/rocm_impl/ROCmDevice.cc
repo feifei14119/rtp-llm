@@ -365,9 +365,9 @@ void ROCmDevice::activation(const ActivationParams& params) {
     //DISPATCH(states.type(), params.atype, states.data(), bias, gate, gate_bias, m, n, stream_);
 }
 
-AttentionModuleOutput ROCmDevice::contextAttention(const AttentionModuleParams& params) {
-    std::cerr << "contextAttention\n";
-}
+// AttentionModuleOutput ROCmDevice::contextAttention(const AttentionModuleParams& params) {
+//     std::cerr << "contextAttention\n";
+// }
 
 RTP_LLM_REGISTER_DEVICE(ROCm);
 

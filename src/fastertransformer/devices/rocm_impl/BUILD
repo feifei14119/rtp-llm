@@ -7,14 +7,16 @@ cc_library(
     ]),
     srcs = glob([
         "*.cc",
-    ]),
+    ], 
+    # exclude=["ROCmAttentionOp.cc"]
+    ),
     deps = [
         "//src/fastertransformer/devices:devices_base",
         "//src/fastertransformer/devices:devices_base_impl",
         "//src/fastertransformer/core:allocator",
         "@local_config_rocm//rocm:rocm_headers",
         "@local_config_rocm//rocm:rocblas",
-        #"//src/fastertransformer/kernels:gpt_kernels_rocm",
+        "//src/fastertransformer/kernels:gpt_kernels_rocm",
         "//src/fastertransformer/rocm:rocm_utils",
     ],
     visibility = ["//visibility:public"],
