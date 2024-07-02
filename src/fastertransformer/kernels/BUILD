@@ -59,7 +59,7 @@ cc_library(
 cc_library(
     name = "gpt_kernels_rocm",
     srcs = [
-        # "gpt_kernels.cu",
+        "gpt_kernels.cu",
         # "add_residual_kernels.cu",
         # "alpha_layernorm_kernels.cu",
         # "rmsnormKernels.cu",
@@ -68,7 +68,7 @@ cc_library(
         "unfused_attention_kernels.cu",
     ],
     hdrs = [
-        # "gpt_kernels.h",
+        "gpt_kernels.h",
         # "add_residual_kernels.h",
         # "alpha_layernorm_kernels.h",
         # "rmsnormKernels.h",

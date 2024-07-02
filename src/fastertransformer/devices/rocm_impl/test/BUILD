@@ -84,3 +84,15 @@ cc_test(
     linkopts = test_linkopts,
     deps = test_deps,
 )
+
+cc_test(
+    name = "embedding_lookup_test",
+    srcs = [
+        "ops/EmbeddingLookupTest.cc",
+    ],
+    data = [],
+    env = device_test_envs(),
+    copts = test_copts + copts(),
+    linkopts = test_linkopts,
+    deps = test_deps,
+)

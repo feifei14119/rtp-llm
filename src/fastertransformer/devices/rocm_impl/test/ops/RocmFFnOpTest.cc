@@ -1,6 +1,7 @@
 #include "src/fastertransformer/devices/rocm_impl/RocmTestUtils.h"
 #include "src/fastertransformer/devices/base_tests/FfnLayerTest.hpp"
 #include "src/fastertransformer/devices/rocm_impl/ROCmDevice.h"
+#include "src/fastertransformer/cuda/Dispatch.h"
 
 
 class RocmFfnLayerTest: public FfnLayerTest {};
