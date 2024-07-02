@@ -128,7 +128,7 @@ SelectOutput ROCmDevice::select(const SelectParams& params) {
     output_shape[0]           = params.index.size();
     auto num_selected_element = input.size() / input.shape()[0];
     auto output               = allocateBuffer({input.type(), output_shape});
-    /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(input.type(),
+    DISPATCH_CUDA_FUNCTION_DATA_TYPE(input.type(),
                                      invokeLookupHiddenStateOfLastToken,
                                      output->data(),
                                      input.data(),
@@ -136,7 +136,7 @@ SelectOutput ROCmDevice::select(const SelectParams& params) {
                                      (int)params.index.size(),
                                      num_selected_element,
                                      0,
-                                     stream_);*/
+                                     stream_);
     return std::move(output);
 }
 
