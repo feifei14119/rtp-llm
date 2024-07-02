@@ -1,6 +1,8 @@
 #include "src/fastertransformer/devices/rocm_impl/ROCmDevice.h"
 #include "src/fastertransformer/devices/rocm_impl/ROCmAllocator.h"
 #include "src/fastertransformer/devices/DeviceFactory.h"
+#include "src/fastertransformer/kernels/activation_kernels.h"
+#include "src/fastertransformer/cuda/Dispatch.h"
 #include "src/fastertransformer/utils/ShapeCheck.h"
 #include <cstring>
 
@@ -363,7 +365,7 @@ void ROCmDevice::activation(const ActivationParams& params) {
         gate_bias = params.gate_bias.value().get().data();
     }
 
-    //DISPATCH(states.type(), params.atype, states.data(), bias, gate, gate_bias, m, n, stream_);
+    DISPATCH(states.type(), params.atype, states.data(), bias, gate, gate_bias, m, n, stream_);
 }
 
 // AttentionModuleOutput ROCmDevice::contextAttention(const AttentionModuleParams& params) {

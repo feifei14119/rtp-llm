@@ -61,3 +61,15 @@ cc_test(
     deps = test_deps,
 )
 
+cc_test(
+    name = "rocm_act_op_test",
+    srcs = [
+        "ops/RocmActOpTest.cc",
+    ],
+    data = [],
+    env = device_test_envs(),
+    copts = test_copts + copts(),
+    linkopts = test_linkopts,
+    deps = test_deps,
+)
+

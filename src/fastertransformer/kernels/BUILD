@@ -64,7 +64,7 @@ cc_library(
         # "alpha_layernorm_kernels.cu",
         # "rmsnormKernels.cu",
         # "layernorm_kernels.cu",
-        # "activation_kernels.cu",
+        "activation_kernels.cu",
         "unfused_attention_kernels.cu",
     ],
     hdrs = [
@@ -73,7 +73,7 @@ cc_library(
         # "alpha_layernorm_kernels.h",
         # "rmsnormKernels.h",
         # "layernorm_kernels.h",
-        # "activation_kernels.h",
+        "activation_kernels.h",
         "kv_cache_utils.h",
         "unfused_attention_kernels.h",
         "decoder_masked_multihead_attention_utils.h",
