@@ -17,7 +17,7 @@
 using namespace std;
 
 namespace fastertransformer {
-using namespace rocm;
+using namespace fastertransformer::rocm;
 
 hipblasOperation_t opConvert(TransposeOperation op) {
     switch (op) {
@@ -183,13 +183,12 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
         output = allocateBuffer({arguments.DDtype, arguments.Dshape, AllocationType::DEVICE}, {"gemm_output"});
     }
 
-    // TODO : TensorRT NOT supported now
-#if 0    
-    if (ROCmGemmDispatch::dispatch(params) == GemmImplementType::WeightOnlyQuantMatmulPlugin) {
-        if (params.A.type() == DataType::TYPE_BF16) {
-            weight_only_matmul_plguin_->init(nvinfer1::DataType::kBF16, trt_plugins::WeightTypeId::INT8);
+    if (ROCmGemmDispatch::dispatch(params) == GemmImplementType::WeightOnlyQuantMatmulPlugin)    
+    {
+        if (params.A.type() == DataType::TYPE_BF16)
+        {
+            weight_only_matmul_plguin_->init(WeightDataType::kBF16, WeightTypeId::INT8);
         }
-        FT_LOG_DEBUG("use int8 only weight gemm.");
         size_t ws_size = weight_only_matmul_plguin_->getWorkspaceSize(arguments.m,
                                                                       arguments.n,
                                                                       arguments.k);
@@ -207,10 +206,10 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
                                             arguments.n,
                                             arguments.k,
                                             stream_);
+                                            
         sync_check_hip_error();
         return std::move(output);
     }
-#endif
 
     auto A_data_type = dtypeConvert(arguments.ADtype);
     auto B_data_type = dtypeConvert(arguments.BDtype);

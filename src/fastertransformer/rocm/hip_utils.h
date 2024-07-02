@@ -66,11 +66,14 @@ enum class OperationType {
 };
 
 /* **************************** debug tools ********************************* */
+static const char* _hipGetErrorEnum(bool error)
+{
+    return error == false? "False" : "True";
+}
 static const char* _hipGetErrorEnum(hipError_t error)
 {
     return hipGetErrorString(error);
 }
-
 static const char* _hipGetErrorEnum(hipblasStatus_t error)
 {
     switch (error) {
@@ -117,11 +120,12 @@ template<typename T>
 void check(T result, char const* const func, const char* const file, int const line)
 {
     if (result) {
-        throw std::runtime_error(std::string("[FT][ERROR] ROCM runtime error: ") + (_hipGetErrorEnum(result)) + " "
-                                 + file + ":" + std::to_string(line) + " \n");
+        throw std::runtime_error(
+            std::string("[FT][ERROR] ROCM runtime error: ") + 
+            (_hipGetErrorEnum(result)) + " " + 
+            file + ":" + std::to_string(line) + " \n");
     }
 }
-
 #define check_hip_error(val) check((val), #val, __FILE__, __LINE__)
 
 inline void syncAndCheck(const char* const file, int const line)
@@ -150,7 +154,6 @@ inline void syncAndCheck(const char* const file, int const line)
     }
 #endif
 }
-
 #define sync_check_hip_error() rocm::syncAndCheck(__FILE__, __LINE__)
 
 template<typename T>

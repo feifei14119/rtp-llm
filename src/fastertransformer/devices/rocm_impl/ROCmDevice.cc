@@ -14,7 +14,7 @@ extern "C" half __truncdfhf2(double a) {
 #endif
 
 namespace fastertransformer {
-using namespace rocm;
+using namespace fastertransformer::rocm;
 
 ROCmDevice::ROCmDevice(const DeviceInitParams& params): DeviceBase(params) {
     RUNTIME_ASSERT_OP_ARG(params.tp_rank == 0, "rocm device doesn't support nccl");
@@ -38,6 +38,10 @@ ROCmDevice::ROCmDevice(const DeviceInitParams& params): DeviceBase(params) {
                             &hipblas_wrapper_mutex_, 
                             allocator_.get()));
    // hipblas_mm_wrapper_->setGemmConfig(CUDA_R_16F, CUDA_R_16F, CUDA_R_16F, CUDA_R_32F);
+
+
+    weight_only_matmul_plguin_ = std::make_unique<WeightOnlyQuantMatmulPlugin>(
+                        WeightDataType::kHALF, WeightTypeId::INT8);
 }
 
 ROCmDevice::~ROCmDevice() {
