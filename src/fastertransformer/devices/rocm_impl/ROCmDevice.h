@@ -1,12 +1,18 @@
 #pragma once
 
+#include "src/fastertransformer/devices/DeviceOps.h"
+#include "src/fastertransformer/devices/DeviceData.h"
+#include "src/fastertransformer/devices/BufferManager.h"
+
 #include <hip/hip_runtime.h>
-#if ENABLE_BF16
 #include <hip/hip_fp16.h>
+#if ENABLE_BF16
+#include <hip/hip_bf16.h>
 #endif
 
 #include "src/fastertransformer/devices/DeviceBase.h"
 #include "src/fastertransformer/rocm/hipblasMMWrapper.h"
+#include "src/fastertransformer/rocm/rocmFmhaWrapper.h"
 #include "src/fastertransformer/rocm/weightOnlyQuantMatmulPlugin.h"
 
 namespace fastertransformer {
@@ -42,6 +48,7 @@ private:
 
     std::unique_ptr<rocm::hipblasAlgoMap> hipblas_algo_map_;
     std::unique_ptr<rocm::hipblasMMWrapper> hipblas_mm_wrapper_;
+    std::unique_ptr<rocmFmhaWrapper>      fmha_runner_;
     std::unique_ptr<rocm::WeightOnlyQuantMatmulPlugin> weight_only_matmul_plguin_;
 };
 

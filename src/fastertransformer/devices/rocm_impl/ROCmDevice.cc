@@ -1,7 +1,9 @@
 #include "src/fastertransformer/devices/rocm_impl/ROCmDevice.h"
 #include "src/fastertransformer/devices/rocm_impl/ROCmAllocator.h"
 #include "src/fastertransformer/devices/DeviceFactory.h"
+#include "src/fastertransformer/kernels/gpt_kernels.h"
 #include "src/fastertransformer/utils/ShapeCheck.h"
+#include "src/fastertransformer/cuda/Dispatch.h"
 #include <cstring>
 
 #include <hip/hip_runtime.h>
@@ -130,7 +132,7 @@ SelectOutput ROCmDevice::select(const SelectParams& params) {
     output_shape[0]           = params.index.size();
     auto num_selected_element = input.size() / input.shape()[0];
     auto output               = allocateBuffer({input.type(), output_shape});
-    /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(input.type(),
+    DISPATCH_CUDA_FUNCTION_DATA_TYPE(input.type(),
                                      invokeLookupHiddenStateOfLastToken,
                                      output->data(),
                                      input.data(),
@@ -138,7 +140,7 @@ SelectOutput ROCmDevice::select(const SelectParams& params) {
                                      (int)params.index.size(),
                                      num_selected_element,
                                      0,
-                                     stream_);*/
+                                     stream_);
     return std::move(output);
 }
 
@@ -156,7 +158,7 @@ BufferPtr ROCmDevice::embeddingLookup(const EmbeddingLookupParams& params) {
 
     auto embeddings = allocateBuffer({data_type, {token_num, hidden_size}}, {"embedding"});
 
-    /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
+    DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,
                                      invokeEmebeddingLookup,
                                      embeddings->data(),
                                      embedding_table.data(),
@@ -168,7 +170,7 @@ BufferPtr ROCmDevice::embeddingLookup(const EmbeddingLookupParams& params) {
                                      token_types.has_value() ? token_types.value().get().data<int>() : nullptr,
                                      token_num,
                                      hidden_size,
-                                     stream_);*/
+                                     stream_);
 
     return std::move(embeddings);
 }
@@ -302,77 +304,9 @@ LayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {
     return;
 }
 
-#define ARGS_DISPATCH(Atype, Dtype, out, bias, gate, gate_bias, m, n, stream)                                          \
-    do {                                                                                                               \
-        invokeGenericActivation<Atype>((Dtype*)out,                                                                    \
-                                       (const Dtype*)bias,                                                             \
-                                       (const Dtype*)gate,                                                             \
-                                       (const Dtype*)gate_bias,                                                        \
-                                       (const int*)nullptr,                                                            \
-                                       (const Dtype*)nullptr,                                                          \
-                                       (int)m,                                                                         \
-                                       (int)n,                                                                         \
-                                       0,                                                                              \
-                                       (const float*)nullptr,                                                          \
-                                       (const float*)nullptr,                                                          \
-                                       (const Dtype*)nullptr,                                                          \
-                                       stream);                                                                        \
-    } while (0)
-
-#define ATYPE_DISPATCH(Dtype, Atype, KERNEL, ...)                                                                      \
-    do {                                                                                                               \
-        if (Atype == ActivationType::Silu) {                                                                           \
-            KERNEL(SiluActivation, Dtype, __VA_ARGS__);                                                                \
-        } else if (Atype == ActivationType::Gelu) {                                                                    \
-            KERNEL(GeluActivation, Dtype, __VA_ARGS__);                                                                \
-        } else if (Atype == ActivationType::Swiglu) {                                                                  \
-            KERNEL(SiluActivation, Dtype, __VA_ARGS__);                                                                \
-        } else {                                                                                                       \
-            throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);                                                       \
-        }                                                                                                              \
-    } while (0)
-
-#define DTYPE_DISPATCH(Dtype, ...)                                                                                     \
-    do {                                                                                                               \
-        if (Dtype == DataType::TYPE_FP16) {                                                                            \
-            ATYPE_DISPATCH(half, __VA_ARGS__);                                                                         \
-        } else {                                                                                                       \
-            throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);                                                       \
-        }                                                                                                              \
-    } while (0)
-
-#define DISPATCH(Dtype, Atype, ...)                                                                                    \
-    do {                                                                                                               \
-        DTYPE_DISPATCH(Dtype, Atype, ARGS_DISPATCH, __VA_ARGS__);                                                      \
-    } while (0)
-
-void ROCmDevice::activation(const ActivationParams& params) {
-    const auto& states = params.states;
-    size_t      m      = states.shape()[0];
-    size_t      n      = states.shape()[1];
-
-    void* bias      = nullptr;
-    void* gate      = nullptr;
-    void* gate_bias = nullptr;
-
-    if (params.bias) {
-        bias = params.bias.value().get().data();
-    }
-
-    if (params.gate) {
-        gate = params.gate.value().get().data();
-    }
-
-    if (params.gate_bias) {
-        gate_bias = params.gate_bias.value().get().data();
-    }
-
-    //DISPATCH(states.type(), params.atype, states.data(), bias, gate, gate_bias, m, n, stream_);
-}
-
-AttentionModuleOutput ROCmDevice::contextAttention(const AttentionModuleParams& params) {
-    std::cerr << "contextAttention\n";
-}
+// AttentionModuleOutput ROCmDevice::contextAttention(const AttentionModuleParams& params) {
+//     std::cerr << "contextAttention\n";
+// }
 
 RTP_LLM_REGISTER_DEVICE(ROCm);
 
