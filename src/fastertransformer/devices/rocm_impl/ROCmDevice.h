@@ -14,6 +14,7 @@
 #include "src/fastertransformer/rocm/hipblasMMWrapper.h"
 #include "src/fastertransformer/rocm/rocmFmhaWrapper.h"
 #include "src/fastertransformer/rocm/weightOnlyQuantMatmulPlugin.h"
+#include "src/fastertransformer/rocm/quantizePreprocessors.h"
 
 namespace fastertransformer {
 
@@ -33,6 +34,8 @@ public:
     LayernormOutput layernorm(const LayernormParams& params) override;
     void activation(const ActivationParams& params) override;
     AttentionModuleOutput contextAttention(const AttentionModuleParams& params) override;
+
+    BufferPtr quantize(const QuantizeParams& params) override;
 
 public:
     rocm::hipblasMMWrapper* hipblasMMWrapperPtr() const {return hipblas_mm_wrapper_.get();}
