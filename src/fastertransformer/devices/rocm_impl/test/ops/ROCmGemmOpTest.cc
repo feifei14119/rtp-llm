@@ -34,8 +34,50 @@ public:
         assertTensorClose(result.C.to(result_ref.C.type()), result_ref.C, 1e-2, 1e-2);
 
     }
+
+    void BasicQuantOpTest(size_t m,
+                        size_t n,
+                        size_t k,
+                        DataType dtype)
+    {
+
+#if 0
+        auto ptdtype = dataTypeToTorchType(dtype);
+        torch::Tensor A = torch::rand({(int)1, (int)64}, torch::Device(torch::kCPU)).to(ptdtype);
+        torch::Tensor B = torch::rand({(int)64, (int)1}, torch::Device(torch::kCPU)).to(ptdtype);
+
+        torch::print(A);
+        torch::print(B);
+        torch::ao.quantization.quantize_dynamic(A,torch::fp16,1.0,torch::qint8);
+        torch::print(A);
+        return;
+#else
+        GemmOpTestInput input = PrepareGemmOpInput(m, n, k, dtype);
+        BufferPtr A = tensorToBuffer(input.A);
+        BufferPtr B = tensorToBuffer(input.B);
+        BufferPtr hB = tensorToBuffer(input.B, AllocationType::HOST);
+        printf("\n***************************************************\n");
+        torch::print(input.B);
+        torch::quantile()
+        BufferPtr QB = device_->quantize(
+                                    {*hB,
+                                    std::nullopt,
+                                    std::nullopt,
+                                    DataType::TYPE_QINT8,
+                                    1});
+        QBuffer * pQB = static_cast<QBuffer*>(QB.get());
+        pQB->kernel().ffPrint("kernel", 64);
+        pQB->scales().ffPrint("scales", 64);
+        printf("***************************************************\n");
+#endif
+    }
 };
 
+TEST_F(ROCmGemmOpTest, BasicGemmOpTest) {
+    BasicQuantOpTest(64, 64, 64, DataType::TYPE_FP16);
+}
+
+#if 0
 TEST_F(ROCmGemmOpTest, BasicGemmOpTest) {
     BasicGemmOpTest(2, 1024, 2048, DataType::TYPE_FP16);
     BasicGemmOpTest(8, 1024, 2048, DataType::TYPE_FP16);
@@ -110,3 +152,4 @@ TEST_F(ROCmGemmOpTest, TransposeBatchMixFloatGemmOP) {
     MixtureBatchTransposeGemmOp(tran, tran, b, k, m, n, k, DataType::TYPE_FP32, DataType::TYPE_FP32);
     MixtureBatchTransposeGemmOp(tran, none, b, k, m, k, n, DataType::TYPE_FP32, DataType::TYPE_FP32);
 }
+#endif

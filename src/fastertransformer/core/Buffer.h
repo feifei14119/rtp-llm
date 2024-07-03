@@ -131,6 +131,30 @@ public:
 
     std::string debugStringMeta() const;
 
+    void ffPrint(std::string name, int cnt = 0)
+    {
+        printf("%s:\n", name.c_str());
+        printf("type = %d\n", (int)(type()));
+        printf("where = %d\n", (int)(where()));
+        printf("dim = %zu\n", dim());
+        printf("shape = [");
+        for(int i = 0; i < dim() - 1; i++)
+            printf("%zu, ", shape()[i]);
+        printf("%zu]\n", shape()[dim() - 1]);        
+        printf("size = %zu\n", size());
+
+        for(int i = 0; i < cnt; i++)
+        {
+            if(isFloat())
+                printf("%.2e, ", ((float*)(data_))[i]);
+            else if(isQuantify() || type_ == DataType::TYPE_INT8)
+                printf("%u, ", ((uint8_t*)(data_))[i]);
+            else
+                printf("%u, ", ((int*)(data_))[i]);
+        }
+        printf("\n---------------------------------------------------\n");
+    }
+
 private:
     DeleterFuncType getSubBufferDeleter() const ;
 
