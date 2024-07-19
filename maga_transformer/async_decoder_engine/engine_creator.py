@@ -43,6 +43,7 @@ def check_exeutor_type(model: BaseModel, config: GptInitModelParameters, specula
 def create_engine(model: BaseModel, config: GptInitModelParameters, speculative_model: Any = None, speculative_config: Optional[GptInitModelParameters] = None, use_rpc: bool = True) -> BaseEngine:
     executor_type = check_exeutor_type(model, config, speculative_model, speculative_config)
     logging.info(f"executor_type: {executor_type}")
+    logging.info(f"use_rpc: {use_rpc}")
     if executor_type == ExecutorType.Normal:
         if use_rpc:
             return _create_cpp_engine(model, config)
@@ -59,12 +60,12 @@ def create_engine(model: BaseModel, config: GptInitModelParameters, speculative_
         raise Exception(f"unsupported executor type: {executor_type}")
 
 def _create_cpp_engine(model: BaseModel, config: GptInitModelParameters) -> RPCEngine:
-    logging.info(f'ft op mem info: used: {get_mem_info().used} free: {get_mem_info().free}')
-    return RPCEngine(model, None)
+    #logging.info(f'ft op mem info: used: {get_mem_info().used} free: {get_mem_info().free}')
+     return RPCEngine(model, None)
 
 def _create_normal_engine(model: BaseModel, config: GptInitModelParameters) -> DecoderEngine:
     model_ops = _create_ops(ModelType.Normal, model, config)
-    logging.info(f'ft op mem info: used: {get_mem_info().used} free: {get_mem_info().free}')
+    #logging.info(f'ft op mem info: used: {get_mem_info().used} free: {get_mem_info().free}')
     nccl_op = NcclOp()
     gen_num_per_circle = 1
     cache_config = CacheConfigGenerator.create_config(config)
@@ -102,7 +103,7 @@ def _create_medusa_engine(model: BaseModel, config: GptInitModelParameters, **kw
     model_ops = _create_ops(ModelType.Medusa, model, config)
     # in medusa, len(token) always equals to len(kvcache), so we need plus 1 to fix
     gen_num_per_circle = len(medusa_buffer.medusa_position_ids) + 1
-    logging.info(f'ft op mem info: used: {get_mem_info().used} free: {get_mem_info().free}')
+    #logging.info(f'ft op mem info: used: {get_mem_info().used} free: {get_mem_info().free}')
     nccl_op = NcclOp()
     cache_config = CacheConfigGenerator.create_config(config)
     cache_manager = CacheManager(cache_config, nccl_op)

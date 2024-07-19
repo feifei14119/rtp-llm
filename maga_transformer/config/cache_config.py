@@ -36,7 +36,8 @@ class CacheConfigGenerator(object):
 
     @staticmethod
     def get_free_memory_size(config: GptInitModelParameters) -> int:
-        free_gpu_memory_size: int = int(get_mem_info().free) # Byte
+        #free_gpu_memory_size: int = int(get_mem_info().free) # Byte
+        free_gpu_memory_size: int = int(60 * 1024 * 1024 * 1024) # Byte
         logging.info(f'free kv cache mem size: {free_gpu_memory_size}')
         kv_cache_mem_size: int = free_gpu_memory_size - config.reserve_runtime_mem_mb * 1024 * 1024
         if config.kv_cache_mem_mb > 0:

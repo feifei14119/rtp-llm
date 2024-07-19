@@ -12,5 +12,6 @@ py_test(
     env = {
         "MODEL_TYPE": "qwen2",
         "CHECKPOINT_PATH": "Qwen/Qwen-1_8B-Chat",
+        #"CHECKPOINT_PATH": "Qwen/Qwen2-7B-Instruct",
     }
 )

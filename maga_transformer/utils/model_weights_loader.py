@@ -654,7 +654,8 @@ def estimate_load_parallel_num(config, tp_size):
     model_size = config.eval_model_size()
     cuda_runtime_mem = 2
     weight_compute_mem = 2
-    free_mem = get_mem_info().free / (1024.0 ** 3)
+    #free_mem = get_mem_info().free / (1024.0 ** 3)
+    free_mem = 60 * 1024 * 1024 * 1024 / (1024.0 ** 3)
     model_mem = model_size / tp_size / (1024.0 ** 3)
     parallel_num = int((free_mem - model_mem) / (weight_compute_mem + cuda_runtime_mem))
     parallel_num = min(max(parallel_num, 1), 4) # 以防并发太多影响 io 效率

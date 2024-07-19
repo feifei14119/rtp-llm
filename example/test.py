@@ -1,4 +1,4 @@
-
+import os
 from maga_transformer.pipeline import Pipeline
 from maga_transformer.model_factory import ModelFactory
 from maga_transformer.openai.openai_endpoint import OpenaiEndopoint
@@ -9,9 +9,21 @@ import asyncio
 import json
 import os
 
+os.environ['USE_NEW_DEVICE_IMPL'] = '1'
+#os.environ['TEST_USING_DEVICE'] = 'CUDA'
+
+use_rpc_model = bool(int(os.environ.get("USE_RPC_MODEL", 0)))
+use_new_device = bool(int(os.environ.get("USE_NEW_DEVICE_IMPL", 0)))
+using_device =os.environ.get("TEST_USING_DEVICE", 0)
+
+print("[FEIFEI]: use_rpc_model = ", use_rpc_model)
+print("[FEIFEI]: use_new_device = ", use_new_device)
+print("[FEIFEI]: using_device = ", using_device)
+
 async def main():
     update_master_info('127.0.0.1', 42345)
 
+    #model = ModelFactory.from_huggingface("Qwen/Qwen-1_8B-Chat")
     model_config = ModelFactory.create_normal_model_config()
     model_config.use_rpc = True
     model = ModelFactory.from_huggingface(model_config.ckpt_path, model_config=model_config)

@@ -76,6 +76,7 @@ cc_test(
         ":test_utils",
     ],
     env = {
-        "TEST_USING_DEVICE": "CUDA",
+        #"TEST_USING_DEVICE": "CUDA",
+        "TEST_USING_DEVICE": "ROCM",
     },
 )

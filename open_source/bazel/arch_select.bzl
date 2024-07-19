@@ -34,7 +34,7 @@ def th_transformer_so():
 def whl_deps():
     return select({
         "//:use_cuda12": ["torch==2.1.0+cu121"],
-        "//conditions:default": ["torch==2.1.0+cu118"],
+        "//conditions:default": ["torch==2.1.2"],
     })
 
 def cutlass_kernels_interface():

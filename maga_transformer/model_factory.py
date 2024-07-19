@@ -81,7 +81,8 @@ class ModelFactory:
     def from_huggingface(model_path_or_name: str, revision: Optional[str] = None, model_config: ModelConfig = ModelConfig()):
         model_path, model_type = get_model_info_from_hf(model_path_or_name, revision)
         new_model_config = model_config
-        new_model_config = new_model_config._replace(model_type=model_type, ckpt_path=model_path, tokenizer_path=model_path)
+        use_rpc_model = bool(int(os.environ.get("USE_RPC_MODEL", 0)))
+        new_model_config = new_model_config._replace(model_type=model_type, ckpt_path=model_path, tokenizer_path=model_path, use_rpc = use_rpc_model)
         return ModelFactory.from_model_config(new_model_config)
 
     @staticmethod
@@ -120,6 +121,7 @@ class ModelFactory:
         if os.environ.get(ACT_TYPE, None):
             act_type = WEIGHT_TYPE.from_str(os.environ.get(ACT_TYPE))
         use_rpc_model = bool(int(os.environ.get("USE_RPC_MODEL", 0)))
+        print("[FEIFEI]: use_rpc_model = %d", use_rpc_model);
         model_config = ModelConfig(model_type=model_type,
                                    ckpt_path=ckpt_path,
                                    tokenizer_path=tokenizer_path,
