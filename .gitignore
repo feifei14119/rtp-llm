@@ -41,3 +41,4 @@ logs/
 package/requirements*.txt
 package/maga_transformer*.whl
 package/maga_start.sh
+maga_transformer/test/model_test/fake_test/testdata/qwen_0.5b/qwen/*.pt
