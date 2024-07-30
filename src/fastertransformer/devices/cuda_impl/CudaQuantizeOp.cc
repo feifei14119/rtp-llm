@@ -13,6 +13,9 @@ inline trt::QuantType trtQuantTypeConvert(DataType dtype) {
         case DataType::TYPE_QINT8: {
             return trt::QuantType::INT8_WEIGHT_ONLY;
         }
+        case DataType::TYPE_QINT4X2: {
+            return trt::QuantType::PACKED_INT4_WEIGHT_ONLY;
+        }
         default: {
             FT_CHECK_WITH_INFO(false, "Invalid quant type");
         }
@@ -34,6 +37,10 @@ BufferPtr CudaDevice::quantize(const QuantizeParams& params) {
                         params.input.type() == DataType::TYPE_BF16),
         "cuda quantize only support half or float quantize. but get %d.", params.input.type());
 
+    FT_CHECK_WITH_INFO((params.qtype == DataType::TYPE_QINT8 ||
+                        params.qtype == DataType::TYPE_QINT4X2),
+        "cuda quantize only support qint8 or qint4x2 quantize. but get %d.", params.qtype);
+
     FT_CHECK_WITH_INFO((params.input.dim() == 2 || params.input.dim() == 3),
         "cuda quantize only support 2D or 3D input.");
 
@@ -45,13 +52,15 @@ BufferPtr CudaDevice::quantize(const QuantizeParams& params) {
 
     if (params.input.where() == MemoryType::MEMORY_CPU) {
         FT_LOG_INFO("cpu quantize");
+        printf("CudaDevice::quantize: MemoryType::MEMORY_CPU\n");
+
         size_t axis = params.input.dim() - 1;
         auto scales = allocateBuffer({DataType::TYPE_FP16,
                                     {params.input.shape()[axis]},
                                     getMemAllocationType(params.input.where())},
                                     {"scales"});
 
-        auto kernel = allocateBuffer({DataType::TYPE_INT8,
+        auto kernel = allocateBuffer({params.qtype == DataType::TYPE_QINT8 ? DataType::TYPE_INT8 : DataType::TYPE_INT4X2,
                                     params.input.shape(),
                                     getMemAllocationType(params.input.where())},
                                     {"kernel"});
@@ -72,6 +81,7 @@ BufferPtr CudaDevice::quantize(const QuantizeParams& params) {
                                     params.input.shape(),
                                     trtQuantTypeConvert(params.qtype));
         } else if (params.input.type() == DataType::TYPE_FP32) {
+            printf("CudaDevice::quantize: MemoryType::MEMORY_CPU:DataType::TYPE_FP32\n");
             trt::symmetric_quantize(kernel->data<int8_t>(),
                                     nullptr,
                                     scales->data<half>(),
@@ -91,28 +101,57 @@ BufferPtr CudaDevice::quantize(const QuantizeParams& params) {
                                                                     {0},
                                                                     nullptr)))));
     } else if (params.input.where() == MemoryType::MEMORY_GPU) {
+        printf("CudaDevice::quantize: MemoryType::MEMORY_GPU\n");
         FT_CHECK_WITH_INFO((params.input.dim() == 2),
             "cuda quantize only support 2D input.");
         // FT_LOG_INFO("invoke invokePerTokenQuantization");
-        auto scales = allocateBuffer({DataType::TYPE_FP32,
+        auto scales = allocateBuffer({DataType::TYPE_FP16,
                                     {params.input.shape()[1]},
                                     getMemAllocationType(params.input.where())},
                                     {"scales"});
 
-        auto kernel = allocateBuffer({DataType::TYPE_INT8,
+        auto kernel = allocateBuffer({params.qtype == DataType::TYPE_QINT8 ? DataType::TYPE_INT8 : DataType::TYPE_INT4X2,
                                     params.input.shape(),
                                     getMemAllocationType(params.input.where())},
                                     {"kernel"});
 
-        DISPATCH_CUDA_FUNCTION_DATA_TYPE(params.input.type(), invokePerTokenQuantization,
-                                         kernel->data<int8_t>(),
-                                         params.input.data(),
-                                         params.input.shape()[0],
-                                         params.input.shape()[1],
-                                         scales->data<float>(),
-                                         params.smoother.has_value() ? params.smoother.value().get().data<float>() : nullptr,
-                                         params.shift.has_value() ? params.shift.value().get().data<float>() : nullptr,
-                                         stream_);
+        if(params.qtype == DataType::TYPE_QINT8)
+        {
+            DISPATCH_CUDA_FUNCTION_DATA_TYPE(params.input.type(), invokePerColQuantizationInt8,
+                                            kernel->data<int8_t>(),
+                                            params.input.data(),
+                                            params.input.shape()[0],
+                                            params.input.shape()[1],
+                                            scales->data<half>(),
+                                            params.smoother.has_value() ? params.smoother.value().get().data<float>() : nullptr,
+                                            params.shift.has_value() ? params.shift.value().get().data<float>() : nullptr,
+                                            stream_);
+        }
+        else if(params.qtype == DataType::TYPE_QINT4X2)
+        {
+            printf("invokeQuantization\n");
+            printf("params.input.size = %d\n",params.input.size());
+            DISPATCH_CUDA_FUNCTION_DATA_TYPE(params.input.type(), invokePerColQuantizationInt4x2,
+                                            kernel->data<int8_t>(),
+                                            params.input.data(),
+                                            params.input.shape()[0],
+                                            params.input.shape()[1],
+                                            scales->data<half>(),
+                                            params.smoother.has_value() ? params.smoother.value().get().data<float>() : nullptr,
+                                            params.shift.has_value() ? params.shift.value().get().data<float>() : nullptr,
+                                            stream_);
+
+            DISPATCH_CUDA_FUNCTION_DATA_TYPE(params.input.type(), invokePerColDequantizationInt4x2,
+                                            params.input.data(),
+                                            kernel->data<int8_t>(),
+                                            params.input.shape()[0],
+                                            params.input.shape()[1],
+                                            scales->data<half>(),
+                                            params.smoother.has_value() ? params.smoother.value().get().data<float>() : nullptr,
+                                            params.shift.has_value() ? params.shift.value().get().data<float>() : nullptr,
+                                            stream_);
+        }
+
         sync_check_cuda_error();
         return BufferPtr(new QBuffer(std::move(kernel),
                                     std::move(scales),

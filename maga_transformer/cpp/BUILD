@@ -151,7 +151,7 @@ cc_library(
             "//src/fastertransformer/devices/arm_impl:arm_cpu_impl",
         ],
         "//conditions:default": [
-            "//src/fastertransformer/devices/cpu_impl:cpu_impl",
+        #"//src/fastertransformer/devices/cpu_impl:cpu_impl",
         ],
     }),
     visibility = ["//visibility:public"]

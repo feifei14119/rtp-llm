@@ -114,10 +114,12 @@ LayoutDetails getLayoutDetailsForArch(QuantType quant_type)
     LayoutDetails details;
     if (quant_type == QuantType::INT8_WEIGHT_ONLY)
     {
+        //printf("quant_type == QuantType::INT8_WEIGHT_ONLY\n");
         details = getLayoutDetailsForArchAndQuantType<cutlassArch, uint8_t>();
     }
     else if (quant_type == QuantType::PACKED_INT4_WEIGHT_ONLY)
     {
+        //printf("qquant_type == QuantType::PACKED_INT4_WEIGHT_ONLY\n");
         details = getLayoutDetailsForArchAndQuantType<cutlassArch, cutlass::uint4b_t>();
     }
     else
@@ -132,14 +134,17 @@ LayoutDetails getLayoutDetailsForTransform(QuantType quant_type)
     const int arch = fastertransformer::getSMVersion();
     if (arch >= 70 && arch < 75)
     {
+        //printf("arch >= 70 && arch < 75\n");
         return getLayoutDetailsForArch<cutlass::arch::Sm70>(quant_type);
     }
     else if (arch >= 75 && arch < 80)
     {
+        //printf("arch >= 75 && arch < 80\n");
         return getLayoutDetailsForArch<cutlass::arch::Sm75>(quant_type);
     }
     else if (arch >= 80 && arch <= 90)
     {
+        //printf("arch >= 80 && arch < 90\n");
         return getLayoutDetailsForArch<cutlass::arch::Sm80>(quant_type);
     }
     else {
@@ -157,7 +162,7 @@ LayoutDetails getLayoutDetailsForTransform(QuantType quant_type)
 void permute_B_rows_for_mixed_gemm(int8_t* permuted_quantized_tensor, const int8_t* quantized_tensor,
     const std::vector<size_t>& shape, QuantType quant_type, const int64_t arch_version)
 {
-
+    //printf("permute_B_rows_for_mixed_gemm\n");
     // We only want to run this step for weight only quant.
     FT_CHECK(quant_type == QuantType::PACKED_INT4_WEIGHT_ONLY || quant_type == QuantType::INT8_WEIGHT_ONLY);
 
@@ -259,6 +264,11 @@ void subbyte_transpose_impl(
     const int num_m_tiles = (num_rows + M_TILE_L1 - 1) / M_TILE_L1;
     const int num_n_tiles = (col_bytes + N_TILE_L1 - 1) / N_TILE_L1;
 
+    printf("subbyte_transpose_impl.num_experts = %d\n", num_experts);
+    printf("subbyte_transpose_impl.num_rows = %d\n", num_rows);
+    printf("subbyte_transpose_impl.col_bytes = %d\n", col_bytes);
+    printf("subbyte_transpose_impl.M_TILE_L1 = %d\n", M_TILE_L1);
+    printf("subbyte_transpose_impl.VECTOR_WIDTH = %d\n", VECTOR_WIDTH);
     for (size_t expert = 0; expert < num_experts; ++expert)
     {
         const size_t matrix_offset = expert * num_rows * col_bytes;
@@ -381,6 +391,7 @@ void subbyte_transpose(int8_t* transposed_quantized_tensor, const int8_t* quanti
 
 void add_bias_and_interleave_int8s_inplace(int8_t* int8_tensor, const size_t num_elts)
 {
+    printf("add_bias_and_interleave_int8s_inplace, num_elts = %d\n", num_elts);
     for (int ii = 0; ii < num_elts; ++ii)
     {
         int8_tensor[ii] = int8_t(int(int8_tensor[ii]) + 128);
@@ -490,6 +501,13 @@ void interleave_column_major_tensor(int8_t* interleaved_quantized_tensor, const 
     const int elts_in_int32 = 32 / BITS_PER_ELT;
 
     const int rows_per_tile = details.rows_per_column_tile;
+    //printf("quant_type = %d\n", quant_type);
+    //printf("shape_size = %d, [0] = %d, [1] = %d\n", shape.size(), shape[0], shape[1]);
+    //printf("num_rows = %d\n", num_rows);
+    //printf("num_cols = %d\n", num_cols);
+    //printf("BITS_PER_ELT = %d\n", BITS_PER_ELT);
+    //printf("elts_in_int32 = %d\n", elts_in_int32);
+    //printf("rows_per_tile = %d\n", rows_per_tile);
 
     FT_CHECK_WITH_INFO(!(num_rows % elts_in_int32),
         fmtstr("The number of rows must be a multiple of %d but the number of rows is %ld.", elts_in_int32, num_rows));
@@ -533,6 +551,12 @@ void preprocess_weights_for_mixed_gemm(int8_t* preprocessed_quantized_weight, co
 {
     LayoutDetails details = getLayoutDetailsForTransform(quant_type);
 
+    //printf("quant_type = %d\n", quant_type);
+    //printf("details.rows_per_column_tile = %d\n", details.rows_per_column_tile);
+    //printf("details.columns_interleaved = %d\n", details.columns_interleaved);
+    //printf("details.uses_imma_ldsm = %d\n", details.uses_imma_ldsm);
+    //printf("details.layoutB = %d\n", details.layoutB);
+
     FT_CHECK_WITH_INFO(shape.size() == 2 || shape.size() == 3, "Shape must be 2-D or 3-D");
 
     size_t num_elts = 1;
@@ -550,6 +574,7 @@ void preprocess_weights_for_mixed_gemm(int8_t* preprocessed_quantized_weight, co
     // Works on row major data, so issue this permutation first.
     if (details.uses_imma_ldsm)
     {
+    //    printf("details.uses_imma_ldsm\n");
         const int arch = getSMVersion();
         permute_B_rows_for_mixed_gemm(dst_buf.data(), src_buf.data(), shape, quant_type, arch);
         src_buf.swap(dst_buf);
@@ -557,12 +582,14 @@ void preprocess_weights_for_mixed_gemm(int8_t* preprocessed_quantized_weight, co
 
     if (details.layoutB == LayoutDetails::Layout::COLUMN_MAJOR)
     {
+    //    printf("details.layoutB == LayoutDetails::Layout::COLUMN_MAJOR\n");
         subbyte_transpose(dst_buf.data(), src_buf.data(), shape, quant_type);
         src_buf.swap(dst_buf);
     }
 
     if (details.columns_interleaved > 1)
     {
+    //    printf("details.columns_interleaved > 1\n");
         interleave_column_major_tensor(dst_buf.data(), src_buf.data(), shape, quant_type, details);
         src_buf.swap(dst_buf);
     }
@@ -610,6 +637,7 @@ template <typename ComputeType, typename WeightType>
 void symmetric_quantize(int8_t* processed_quantized_weight, int8_t* unprocessed_quantized_weight,
     ComputeType* scale_ptr, const WeightType* input_weight_ptr, const std::vector<size_t>& shape, QuantType quant_type)
 {
+    printf("symmetric_quantize\n");
 
     FT_CHECK_WITH_INFO(processed_quantized_weight, "Processed quantized tensor is NULL");
     FT_CHECK_WITH_INFO(scale_ptr, "Scale output pointer is NULL");
@@ -636,10 +664,17 @@ void symmetric_quantize(int8_t* processed_quantized_weight, int8_t* unprocessed_
 
     std::vector<float> per_col_max(num_cols);
 
+    printf("num_rows = %d\n", num_rows);
+    printf("num_cols = %d\n", num_cols);
+    printf("num_experts = %d\n", num_experts);
+    printf("input_mat_size = %d\n", input_mat_size);
+    printf("quantized_mat_size = %d\n", quantized_mat_size);
+    printf("quant_range_scale = %f (1/128)\n", quant_range_scale);
     for (int expert = 0; expert < num_experts; ++expert)
     {
         const WeightType* current_weight = input_weight_ptr + expert * input_mat_size;
         int8_t* current_quantized_weight = unprocessed_quantized_weight + expert * quantized_mat_size;
+        //int8_t* current_quantized_weight = processed_quantized_weight + expert * quantized_mat_size;
 
         // First we find the per column max for this expert weight.
         for (int jj = 0; jj < num_cols; ++jj)
@@ -653,6 +688,8 @@ void symmetric_quantize(int8_t* processed_quantized_weight, int8_t* unprocessed_
             for (int jj = 0; jj < num_cols; ++jj)
             {
                 per_col_max[jj] = std::max(per_col_max[jj], std::abs(float(current_weight_row[jj])));
+                //printf("current_weight_row[jj] = %f\n", current_weight_row[jj]);
+                //printf("per_col_max[jj] = %f\n", per_col_max[jj]);
             }
         }
 
@@ -662,6 +699,8 @@ void symmetric_quantize(int8_t* processed_quantized_weight, int8_t* unprocessed_
         {
             per_col_max[jj] *= quant_range_scale;
             current_scales[jj] = ComputeType(per_col_max[jj]);
+            //printf("per_col_max[jj] = %f (per_col_max[] / 128)\n", per_col_max[jj]);
+            //printf("current_scales[jj] = %f\n", current_scales[jj]);
         }
 
         // Finally, construct the weights.
@@ -669,6 +708,7 @@ void symmetric_quantize(int8_t* processed_quantized_weight, int8_t* unprocessed_
         {
             int8_t* current_quantized_weight_row = current_quantized_weight + ii * bytes_per_out_col;
             const WeightType* current_weight_row = current_weight + ii * num_cols;
+            //printf("bytes_per_out_col = %d\n", bytes_per_out_col);
             for (int jj = 0; jj < bytes_per_out_col; ++jj)
             {
 
@@ -679,6 +719,10 @@ void symmetric_quantize(int8_t* processed_quantized_weight, int8_t* unprocessed_
                     const float scaled_weight = round(weight_elt / col_scale);
                     const int8_t clipped_weight = int8_t(std::max(-128.f, std::min(127.f, scaled_weight)));
                     current_quantized_weight_row[jj] = clipped_weight;
+                    //printf("col_scale = %f\n", col_scale);
+                    //printf("weight_elt = %f\n", weight_elt);
+                    //printf("scaled_weight = %f\n", scaled_weight);
+                    //printf("clipped_weight = %d\n", clipped_weight);
                 }
                 else if (quant_type == QuantType::PACKED_INT4_WEIGHT_ONLY)
                 {
@@ -712,6 +756,20 @@ void symmetric_quantize(int8_t* processed_quantized_weight, int8_t* unprocessed_
     }
 
     preprocess_weights_for_mixed_gemm(processed_quantized_weight, unprocessed_quantized_weight, shape, quant_type);
+
+    /*printf("\n[feifei]:3333333333333333\n");
+    printf("shape_size = %d, [0] = %d, [1] = %d, type = %d\n", shape.size(), shape[0], shape[1], quant_type);
+    for(int i = 0;i < shape[0]; i++)
+    {
+        for (int j = 0; j < shape[1]; j++)
+        {
+            uint32_t idx = i*shape[1] + j;
+            //printf("%.2f, ", input_weight_ptr[idx]);
+            printf("%d, ", processed_quantized_weight[idx]);
+        }
+        printf("\n");
+    }
+    printf("\n[feifei]:3333333333333333\n");*/
 }
 
 template void symmetric_quantize<half, float>(

@@ -96,7 +96,7 @@ int WeightOnlyQuantMatmulPlugin::enqueue(const void*  inputs,
                                          const int    k,
                                          cudaStream_t stream) noexcept
 {
-    const bool use_cuda_kernel = m < SMALL_M_FAST_PATH && mCudaKernelEnabled;
+    const bool use_cuda_kernel = m <= SMALL_M_FAST_PATH && mCudaKernelEnabled;
 #if defined(ENABLE_BF16)
     TLLM_CHECK_WITH_INFO(mType == nvinfer1::DataType::kHALF || mType == nvinfer1::DataType::kBF16,
         "No valid weightOnlyQuantMatmul configuration");
@@ -134,6 +134,10 @@ int WeightOnlyQuantMatmulPlugin::enqueue(const void*  inputs,
         real_n = n * INT8_INT4_RATIO;
     }
 
+    printf("m = %d\n", m);
+    printf("SMALL_M_FAST_PATH = %d\n", SMALL_M_FAST_PATH);
+    printf("mCudaKernelEnabled = %d\n", mCudaKernelEnabled);
+    printf("use_cuda_kernel = %d\n", use_cuda_kernel);
     if (use_cuda_kernel) {
         // Use CUDA kernels for small batch size
         // The CUDA kernel is designed for ColumnMajorTileInterleave weight layout used in fpAIntB cutlass

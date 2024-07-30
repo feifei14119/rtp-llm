@@ -684,7 +684,14 @@ __device__ void weight_only_batched_gemv(const uint8_t* qweight, const ActType* 
             bias_v = static_cast<float>(bias[n_start_id + nid]);
         }
         int b = i / NPerBlock / Interleave;
-        out[b * n + n_start_id + nid] = static_cast<ActType>(ActOp<float>::apply(v + bias_v));
+        //out[b * n + n_start_id + nid] = static_cast<ActType>(ActOp<float>::apply(v + bias_v));
+
+        ActType ffval = 0;
+        for(uint32_t ff = 0;ff<8;ff++)
+        {
+            ffval += static_cast<ActType>(qweight[tid + ff * 4]);
+        }
+        out[b * n + n_start_id + nid] = static_cast<ActType>(static_cast<float>(scales[tid]) * static_cast<float>(ffval));
     }
 }
 
@@ -815,7 +822,11 @@ struct WeightOnlyBatchedGemvKernelLauncher
 
     static void run(const WeightOnlyParams& params, cudaStream_t stream)
     {
+        printf("WeightOnlyBatchedGemvKernelLauncher::run()\n");
         if (params.act_type == WeightOnlyActivationType::FP16) {
+            printf("params.act_type == WeightOnlyActivationType::FP16\n");
+            printf("Zero == %d\n", Zero);
+            printf("Bias == %d\n", Bias);
             static constexpr int kInterleave = WeightLayoutDetails<half, QType, Arch>::kInterleave;
             dim3 grid(params.n / NPerBlock / kInterleave);
             dim3 block(BlockSize);

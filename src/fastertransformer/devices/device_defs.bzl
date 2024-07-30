@@ -17,7 +17,7 @@ def device_test_envs():
     return select({
         "//:using_cuda": {
             "TEST_USING_DEVICE": "CUDA",
-            "LD_PRELOAD": "libtorch_cpu.so",
+            "LD_PRELOAD": "/usr/local/lib/python3.10/dist-packages/torch/lib/libtorch_cpu.so",
         },
         "//:using_rocm": {
             "TEST_USING_DEVICE": "ROCM",
@@ -32,7 +32,7 @@ def device_test_envs():
             # which causes SIGABRT on munmap_chunk() called via std::regex compiler.
             # a related discussion: https://github.com/apache/tvm/issues/9362
             # force preloading torch so to avoid the conflict.
-            "LD_PRELOAD": "libtorch_cpu.so",
+            "LD_PRELOAD": "/usr/local/lib/python3.10/dist-packages/torch/lib/libtorch_cpu.so",
         },
     })
 

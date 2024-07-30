@@ -75,6 +75,7 @@ Tensor fused_gemm_dq_helper(Tensor input_activations, Tensor weight, Tensor scal
 
     if (!select_config)
     {
+        printf("fused_gemm_dq_helper !select_config\n");
         tc::CutlassGemmConfig config = runner->getChosenConfig(input_act_ptr, weight_ptr, scales_ptr, zeros_ptr,
             nullptr, output_tensor_ptr, m, n, k, group_size, ws_ptr, ws_bytes, stream);
 
@@ -286,6 +287,7 @@ Tensor _fused_gemm_dq(Tensor  input_activations,
                         input_activations, weight, scales, timing_iterations, avg_time);
                 }
             } else if (quant_type == at::ScalarType::QUInt4x2) {
+                printf("quant_type == torch::QUInt4x2\n");
                 output_tensor = fused_gemm_dq_helper<half, cutlass::uint4b_t>(
                     input_activations, weight, scales, zeros, group_size, timing_iterations, avg_time, select_config);
             } else {

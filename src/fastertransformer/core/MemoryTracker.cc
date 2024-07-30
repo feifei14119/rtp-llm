@@ -1,6 +1,8 @@
 #include "src/fastertransformer/utils/logger.h"
 #include "src/fastertransformer/core/MemoryTracker.h"
 
+#include <mutex>
+
 using namespace std;
 using ReadLock = std::shared_lock<std::shared_mutex>;
 using WriteLock = std::unique_lock<std::shared_mutex>;

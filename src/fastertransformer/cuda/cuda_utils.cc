@@ -381,7 +381,7 @@ void print_bshd(const int   layer_id,
     }
     printf("layer_id: %d %s [%d %d %d %d]\n", layer_id, name, batch_size, seq_len, num_heads, hidden_size_per_head);
     fflush(stdout);
-    for (int i = 0; i < batch_size; i++) {
+    /*for (int i = 0; i < batch_size; i++) {
         for (int j = 0; j < seq_len; j++) {
             auto print_func = [&](int head_start, int head_end){
                 auto md_array_ptr = (T(*)[seq_len][total_num_heads][hidden_size_per_head])cpu_ptr;
@@ -403,7 +403,7 @@ void print_bshd(const int   layer_id,
             print_func(0, std::min(num_heads, 4));
             print_func(std::max(0, num_heads - 4), num_heads);
         }
-    }
+    }*/
     fflush(stdout);
 }
 
@@ -511,7 +511,7 @@ void print_bsd(const int   layer_id,
     }
     printf("layer_id: %d %s [%d %d %d]\n", layer_id, name, batch_size, seq_len, hidden_size);
     fflush(stdout);
-    for (int i = 0; i < batch_size; i++) {
+    /*for (int i = 0; i < batch_size; i++) {
         for (int j = 0; j < seq_len; j++) {
             printf("b_%d s_%d ", i, j);
             fflush(stdout);
@@ -533,7 +533,7 @@ void print_bsd(const int   layer_id,
             printf("sum1 = %f, square sum2 = %lf\n", sum1, sum2);
             fflush(stdout);
         }
-    }
+    }*/
     fflush(stdout);
 }
 

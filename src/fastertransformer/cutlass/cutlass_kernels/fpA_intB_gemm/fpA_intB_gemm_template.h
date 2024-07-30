@@ -57,6 +57,7 @@ void generic_mixed_gemm_kernelLauncher(const T* A, const WeightType* B, const T*
     tkc::CutlassGemmConfig gemm_config, char* workspace, size_t workspace_bytes, cudaStream_t stream,
     int* occupancy = nullptr)
 {
+    printf("generic_mixed_gemm_kernelLauncher\n");
     FT_LOG_TRACE(__PRETTY_FUNCTION__);
 
 #ifdef ENABLE_BF16
@@ -302,6 +303,7 @@ void dispatch_gemm_to_cutlass(const T* A, const WeightType* B, const T* weight_s
     tkc::CutlassGemmConfig gemm_config, cudaStream_t stream, int* occupancy = nullptr)
 {
 
+    printf("dispatch_gemm_to_cutlass\n");
     FT_LOG_TRACE(__PRETTY_FUNCTION__);
 
     // Note that SIMT configs are omitted here since they are not supported for fpA_intB.
@@ -388,18 +390,21 @@ void CutlassFpAIntBGemmRunner<T, WeightType, QuantOp>::dispatch_to_arch<Epilogue
     FT_LOG_TRACE(__PRETTY_FUNCTION__);
     if (sm_ >= 70 && sm_ < 75)
     {
+        printf("sm_ >= 70 && sm_ <= 75\n");
         dispatch_gemm_to_cutlass<T, WeightType, cutlass::arch::Sm70, QuantOp, EpilogueTag>(A, B, weight_scales,
             weight_zero_points, biases, C, m, n, k, group_size, workspace_ptr, workspace_bytes, gemm_config, stream,
             occupancy);
     }
     else if (sm_ >= 75 && sm_ < 80)
     {
+        printf("sm_ >= 75 && sm_ <= 80\n");
         dispatch_gemm_to_cutlass<T, WeightType, cutlass::arch::Sm75, QuantOp, EpilogueTag>(A, B, weight_scales,
             weight_zero_points, biases, C, m, n, k, group_size, workspace_ptr, workspace_bytes, gemm_config, stream,
             occupancy);
     }
     else if (sm_ >= 80 && sm_ <= 90)
     {
+        printf("sm_ >= 80 && sm_ <= 90\n");
         dispatch_gemm_to_cutlass<T, WeightType, cutlass::arch::Sm80, QuantOp, EpilogueTag>(A, B, weight_scales,
             weight_zero_points, biases, C, m, n, k, group_size, workspace_ptr, workspace_bytes, gemm_config, stream,
             occupancy);
@@ -438,8 +443,8 @@ void CutlassFpAIntBGemmRunner<T, WeightType, QuantOp>::gemm(const void* A, const
     void* C, int m, int n, int k, tkc::CutlassGemmConfig gemmConfig, char* workspace_ptr, const size_t workspace_bytes,
     cudaStream_t stream)
 {
+    printf("CutlassFpAIntBGemmRunner<T, WeightType, PER_COLUMN_SCALE_ONLY>::gemm\n");
     FT_LOG_TRACE(__PRETTY_FUNCTION__);
-
     if constexpr (QuantOp == cutlass::WeightOnlyQuantOp::PER_COLUMN_SCALE_ONLY)
     {
         dispatch_to_arch<tkc::EpilogueOpDefault>((const T*) A, (const WeightType*) B, (const T*) weight_scales, nullptr,

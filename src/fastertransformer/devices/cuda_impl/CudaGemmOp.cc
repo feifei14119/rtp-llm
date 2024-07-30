@@ -7,6 +7,8 @@
 #include "src/fastertransformer/utils/ShapeCheck.h"
 #include "src/fastertransformer/core/BufferHelper.h"
 #include "autil/StringUtil.h"
+#include "src/fastertransformer/cuda/Dispatch.h"
+#include "src/fastertransformer/kernels/quantization_tensor.h"
 
 #include <numeric>
 #include <utility>
@@ -142,6 +144,7 @@ struct CudaGemmArguments {
 ///          B [b, ..., k, n]
 ///          C [b, ..., m, n]
 BufferPtr CudaDevice::gemm(const GemmParams& params) {
+    printf("CudaDevice::gemm\n");
     params.check();
     CudaGemmArguments arguments(params);
 
@@ -155,6 +158,165 @@ BufferPtr CudaDevice::gemm(const GemmParams& params) {
             params.D->debugString().c_str());
     } else {
         output = allocateBuffer({arguments.DDtype, arguments.Dshape, AllocationType::DEVICE}, {"gemm_output"});
+    }
+
+
+    if (params.dispatch() == GemmType::BufferA_QBufferB_BufferC_2DGemm) {
+        printf("CudaDevice::gemm::GemmType::BufferA_QBufferB_BufferC_2DGemm\n");
+        if(params.B.type() == DataType::TYPE_QINT8)
+        {
+            printf("params.B.type() == DataType::TYPE_QINT8\n");
+            BUFFER_DTYPE_CHECK(params.A, {DataType::TYPE_FP16, DataType::TYPE_BF16});
+            BUFFER_DTYPE_CHECK(params.B, {DataType::TYPE_QINT8});
+            
+            weight_only_matmul_plugin_->init(nvinfer1DtypeConvert(params.A.type()), trt_plugins::WeightTypeId::INT8);
+            FT_LOG_DEBUG("use int8 only weight gemm.");
+
+            size_t ws_size = weight_only_matmul_plugin_->getWorkspaceSize(arguments.m,
+                                                                            arguments.n,
+                                                                            arguments.k);
+            auto workspace = allocateBuffer({DataType::TYPE_BYTES,
+                                            {ws_size},
+                                            AllocationType::DEVICE},
+                                            {"workspace"});
+
+            const QBuffer &QB = reinterpret_cast<const QBuffer&>(params.B);
+            auto fpB = allocateBuffer({params.A.type(),
+                                            {params.B.shape()},
+                                            AllocationType::DEVICE},
+                                            {"fpB"});
+
+            // dequant B
+            DISPATCH_CUDA_FUNCTION_DATA_TYPE(params.A.type(), invokePerColDequantizationInt8,
+                                            fpB.get()->data(),
+                                            QB.kernel().data<int8_t>(),
+                                            arguments.k,
+                                            arguments.n,
+                                            QB.scales().data<half>(),
+                                            nullptr,
+                                            nullptr,
+                                            stream_);
+            sync_check_cuda_error();
+            printf("\n---------------------------------------\n");
+            printf("fpB:\n %s\n", fpB.get()->debugString().c_str());
+            printf("\n---------------------------------------\n");
+
+            auto A_data_type = dtypeConvert(arguments.ADtype);
+            auto B_data_type = dtypeConvert(fpB.get()->type());
+            auto D_data_type = dtypeConvert(arguments.DDtype);
+            auto computeType = CUDA_R_32F;
+            const auto A = params.A.data();
+            const auto B = fpB.get()->data();
+            auto D = output->data();
+            auto a_op = opConvert(params.transA);
+            auto b_op = opConvert(params.transB);
+            printf("\nffffffffffffffffffffffffff\n");
+            printf("[GEMM]a_op = %d, b_op = %d\n", a_op, b_op);
+            printf("[GEMM]A_data_type = %d, B_data_type = %d\n", A_data_type, B_data_type);
+            printf("[GEMM]D_data_type = %d, computeType = %d\n", D_data_type, computeType);
+            printf("[GEMM]m, n, k = %d, %d, %d\n", arguments.m, arguments.n, arguments.k);
+            printf("[GEMM]alpha = %.2f, beta = %.2f\n", arguments.alpha, arguments.beta);
+            printf("[GEMM]lda = %d, ldb = %d, ldc = %d\n", arguments.lda, arguments.ldb, arguments.ldc);
+            printf("\nffffffffffffffffffffffffff\n");
+            cublas_mm_wrapper_->Gemm(a_op,
+                                    b_op,
+                                    arguments.n,
+                                    arguments.m,
+                                    arguments.k,
+                                    &arguments.alpha,
+                                    B,
+                                    A_data_type,
+                                    arguments.ldb,
+                                    A,
+                                    A_data_type,
+                                    arguments.lda,
+                                    &arguments.beta,
+                                    D,
+                                    D_data_type,
+                                    arguments.ldc,
+                                    computeType,
+                                    cublasGemmAlgo_t(-1));
+
+            sync_check_cuda_error();
+            return move(output);
+        }
+        if(params.B.type() == DataType::TYPE_QINT4X2)
+        {
+            printf("params.B.type() == DataType::TYPE_QINT4X2\n");
+            BUFFER_DTYPE_CHECK(params.A, {DataType::TYPE_FP16, DataType::TYPE_BF16});
+            BUFFER_DTYPE_CHECK(params.B, {DataType::TYPE_QINT4X2});
+            
+            weight_only_matmul_plugin_->init(nvinfer1DtypeConvert(params.A.type()), trt_plugins::WeightTypeId::INT8);
+            FT_LOG_DEBUG("use int8 only weight gemm.");
+
+            size_t ws_size = weight_only_matmul_plugin_->getWorkspaceSize(arguments.m,
+                                                                            arguments.n,
+                                                                            arguments.k);
+            auto workspace = allocateBuffer({DataType::TYPE_BYTES,
+                                            {ws_size},
+                                            AllocationType::DEVICE},
+                                            {"workspace"});
+
+            const QBuffer &QB = reinterpret_cast<const QBuffer&>(params.B);
+            auto fpB = allocateBuffer({params.A.type(),
+                                            {params.B.shape()},
+                                            AllocationType::DEVICE},
+                                            {"fpB"});
+
+            // dequant B
+            DISPATCH_CUDA_FUNCTION_DATA_TYPE(params.A.type(), invokePerColDequantizationInt4x2,
+                                            fpB.get()->data(),
+                                            QB.kernel().data<int8_t>(),
+                                            arguments.k,
+                                            arguments.n,
+                                            QB.scales().data<half>(),
+                                            nullptr,
+                                            nullptr,
+                                            stream_);
+            sync_check_cuda_error();
+            printf("\n---------------------------------------\n");
+            printf("fpB:\n %s\n", fpB.get()->debugString().c_str());
+            printf("\n---------------------------------------\n");
+
+            auto A_data_type = dtypeConvert(arguments.ADtype);
+            auto B_data_type = dtypeConvert(fpB.get()->type());
+            auto D_data_type = dtypeConvert(arguments.DDtype);
+            auto computeType = CUDA_R_32F;
+            const auto A = params.A.data();
+            const auto B = fpB.get()->data();
+            auto D = output->data();
+            auto a_op = opConvert(params.transA);
+            auto b_op = opConvert(params.transB);
+            printf("\nffffffffffffffffffffffffff\n");
+            printf("[GEMM]a_op = %d, b_op = %d\n", a_op, b_op);
+            printf("[GEMM]A_data_type = %d, B_data_type = %d\n", A_data_type, B_data_type);
+            printf("[GEMM]D_data_type = %d, computeType = %d\n", D_data_type, computeType);
+            printf("[GEMM]m, n, k = %d, %d, %d\n", arguments.m, arguments.n, arguments.k);
+            printf("[GEMM]alpha = %.2f, beta = %.2f\n", arguments.alpha, arguments.beta);
+            printf("[GEMM]lda = %d, ldb = %d, ldc = %d\n", arguments.lda, arguments.ldb, arguments.ldc);
+            printf("\nffffffffffffffffffffffffff\n");
+            cublas_mm_wrapper_->Gemm(a_op,
+                                    b_op,
+                                    arguments.n,
+                                    arguments.m,
+                                    arguments.k,
+                                    &arguments.alpha,
+                                    B,
+                                    A_data_type,
+                                    arguments.ldb,
+                                    A,
+                                    A_data_type,
+                                    arguments.lda,
+                                    &arguments.beta,
+                                    D,
+                                    D_data_type,
+                                    arguments.ldc,
+                                    computeType,
+                                    cublasGemmAlgo_t(-1));
+
+            sync_check_cuda_error();
+            return move(output);
+        }
     }
 
     if (params.dispatch() == GemmType::QBufferA_QBufferB_BufferC_2DGemm) {
@@ -192,6 +354,7 @@ BufferPtr CudaDevice::gemm(const GemmParams& params) {
         return std::move(output);
     }
 
+#if 0
     if (params.dispatch() == GemmType::BufferA_QBufferB_BufferC_2DGemm) {
         if (reinterpret_cast<const QBuffer&>(params.B).zerosData() != nullptr) {
             FT_LOG_DEBUG("use group wise int4 gemm.");
@@ -258,6 +421,7 @@ BufferPtr CudaDevice::gemm(const GemmParams& params) {
         }
 
     }
+#endif
 
     auto A_data_type = dtypeConvert(arguments.ADtype);
     auto B_data_type = dtypeConvert(arguments.BDtype);
@@ -276,6 +440,14 @@ BufferPtr CudaDevice::gemm(const GemmParams& params) {
     if (params.dispatch() == GemmType::BufferA_BufferB_BufferC_2DGemm) {
         BUFFER_DTYPE_CHECK(params.A, {DataType::TYPE_FP16, DataType::TYPE_BF16, DataType::TYPE_FP32});
         BUFFER_DTYPE_CHECK(params.B, {DataType::TYPE_FP16, DataType::TYPE_BF16, DataType::TYPE_FP32});
+            printf("\nffffffffffffffffffffffffff\n");
+            printf("[GEMM]a_op = %d, b_op = %d\n", a_op, b_op);
+            printf("[GEMM]A_data_type = %d, B_data_type = %d\n", A_data_type, B_data_type);
+            printf("[GEMM]D_data_type = %d, computeType = %d\n", D_data_type, computeType);
+            printf("[GEMM]m, n, k = %d, %d, %d\n", arguments.m, arguments.n, arguments.k);
+            printf("[GEMM]alpha = %.2f, beta = %.2f\n", arguments.alpha, arguments.beta);
+            printf("[GEMM]lda = %d, ldb = %d, ldc = %d\n", arguments.lda, arguments.ldb, arguments.ldc);
+            printf("\nffffffffffffffffffffffffff\n");
         cublas_mm_wrapper_->Gemm(b_op,
                                  a_op,
                                  arguments.n,

@@ -139,6 +139,7 @@ Tensor preprocess_weights_for_mixed_gemm(Tensor row_major_quantized_weight, torc
 std::vector<Tensor>
 symmetric_quantize_helper(Tensor weight, torch::ScalarType quant_type, bool return_unprocessed_quantized_tensor)
 {
+    printf("symmetric_quantize_helper\n");
     CHECK_CPU(weight);
     CHECK_CONTIGUOUS(weight);
     TORCH_CHECK(weight.numel() != 0, "weight should not be empty tensor");
@@ -190,6 +191,7 @@ symmetric_quantize_helper(Tensor weight, torch::ScalarType quant_type, bool retu
                                              ft_quant_type);
     }
     else if (weight.scalar_type() == at::ScalarType::Half) {
+        printf("weight.scalar_type() == at::ScalarType::Half\n");
         ft::symmetric_quantize<half, half>(processed_quantized_weight_ptr,
                                            unprocessed_quantized_weight_ptr,
                                            get_ptr<half>(scales),
@@ -228,6 +230,7 @@ std::vector<Tensor> symmetric_quantize_last_axis_of_batched_matrix(Tensor weight
 // Exposed mainly for testing, so that the unprocessed weights can be passed to torch functions.
 std::vector<Tensor> _symmetric_quantize_last_axis_of_batched_matrix(Tensor weight, torch::ScalarType quant_type)
 {
+    printf("_symmetric_quantize_last_axis_of_batched_matrix\n");
     return symmetric_quantize_helper(weight, quant_type, true);
 }
 

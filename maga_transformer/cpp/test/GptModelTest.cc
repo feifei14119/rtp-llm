@@ -15,7 +15,8 @@ class GptModelTest: public DeviceTestBase {
 };
 
 TEST_F(GptModelTest, testSimple) {
-    const auto path = test_data_path_ + "../../test/model_test/fake_test/testdata/qwen_0.5b";
+    //const auto path = test_data_path_ + "../../test/model_test/fake_test/testdata/qwen_0.5b";
+    const auto path = "/home/feifei/ali/qwen";
     auto weights = loadWeightsFromDir(path);
     FT_CHECK(weights->lm_head->kernel != nullptr);
     FT_CHECK(weights->embedding != nullptr);

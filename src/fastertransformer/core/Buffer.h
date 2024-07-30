@@ -65,9 +65,12 @@ public:
     template<typename T>
     inline T* data() const {
         static_assert(!std::is_same<T, void>::value);
-        FT_CHECK_WITH_INFO(
-            type_ == getTensorType<T>(),
-            "get data type %d not match buffer type %d", getTensorType<T>(), type_);
+        if(type_ != DataType::TYPE_INT4X2)
+        {
+            FT_CHECK_WITH_INFO(
+                type_ == getTensorType<T>(),
+                "get data type %d not match buffer type %d", getTensorType<T>(), type_);
+        }
         return static_cast<T*>(data_);
     }
 
@@ -121,13 +124,31 @@ public:
         auto total_size = size();
         std::ostringstream oss;
         auto data_size = std::min(count, total_size);
-        for (size_t i = 0; i < data_size; i++) {
-            oss << base[i] << ", ";
-        }
-        if (data_size != total_size) {
-            oss << "...... ";
-            for (size_t i = total_size - data_size; i < total_size; i++) {
+
+        if(type_ != DataType::TYPE_QINT4X2 && type_ != DataType::TYPE_INT4X2)
+        {
+            for (size_t i = 0; i < data_size; i++) {
                 oss << base[i] << ", ";
+            }
+            if (data_size != total_size) {
+                oss << "...... ";
+                for (size_t i = total_size - data_size; i < total_size; i++) {
+                    oss << base[i] << ", ";
+                }
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < data_size / 2; i++) {
+                oss << ((uint8_t)(base[i]) & 0x0F) << ", ";
+                oss << (((uint8_t)(base[i]) & 0xF0) >> 4) << ", ";
+            }
+            if (data_size != total_size) {
+                oss << "...... ";
+                for (size_t i = (total_size - data_size) / 2; i < total_size / 2; i++) {
+                    oss << ((uint8_t)(base[i]) & 0x0F) << ", ";
+                    oss << (((uint8_t)(base[i]) & 0xF0) >> 4) << ", ";
+                }
             }
         }
         return "BufferData Detail(" + oss.str() + ")";

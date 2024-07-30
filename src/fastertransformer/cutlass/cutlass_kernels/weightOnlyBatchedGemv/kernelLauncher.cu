@@ -48,6 +48,9 @@ struct WeightOnlyBatchedGemvKernelSm70Launcher
 template<WeightOnlyQuantType QType, typename WeightOnlyFlag, template<typename T> class ActOp, int BATCH>
 void select_arch(const WeightOnlyParams& params, cudaStream_t stream)
 {
+    printf("params.sm = %d\n", params.sm);
+    printf("params.k = %d\n", params.k);
+    printf("params.n = %d\n", params.n);
     if (params.sm == 70) {
         if (params.k <= 20480) {
             if (params.n >= 64) {
@@ -73,6 +76,7 @@ void select_arch(const WeightOnlyParams& params, cudaStream_t stream)
         }
     }
     else {
+        printf("select_arch.else\n");
         WeightOnlyBatchedGemvKernelLauncher<QType,
                                             cutlass::arch::Sm75,
                                             WeightOnlyFlag,
@@ -90,6 +94,7 @@ void weight_only_batched_gemv_launcher(const WeightOnlyParams& params, cudaStrea
     assert(params.weight_only_type == WeightOnlyType::PerChannel);
     assert(params.quant_type== WeightOnlyQuantType::Int8b);
     if (params.weight_only_type == WeightOnlyType::PerChannel && params.quant_type == WeightOnlyQuantType::Int8b) {
+        printf("params.m = %d\n",params.m);
         switch (params.m) {
             case 1: {
                 select_arch<WeightOnlyQuantType::Int8b, WeightOnlyPerChannel, IdentityActivation, 1>(params, stream);

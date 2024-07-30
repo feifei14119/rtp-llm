@@ -85,6 +85,7 @@ inline c10::ScalarType dataTypeToTorchType(DataType data_type) {
 
     switch (data_type) {
         FOREACH_BUFFER_TORCH_TYPE_MAP(TYPE_CASE);
+        case DataType::TYPE_INT4X2:return torch::kChar;
     default:
         FT_LOG_ERROR("Unsupported data type: [%d]", data_type);
         throw std::runtime_error("Unsupported data type " + std::to_string((int8_t)data_type));
