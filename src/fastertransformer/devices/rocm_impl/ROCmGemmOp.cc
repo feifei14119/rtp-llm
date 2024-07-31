@@ -249,7 +249,7 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
             DISPATCH_CUDA_FUNCTION_DATA_TYPE(params.A.type(),
                                              invokePerColDequantizationInt4x2,
                                              fpB.get()->data(),
-                                             QB.kernel().data<int8_t>(),
+                                             (int8_t*)(QB.kernel().data()),
                                              arguments.k,
                                              arguments.n,
                                              QB.scales().data<half>(),
