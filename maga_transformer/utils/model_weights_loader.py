@@ -389,6 +389,9 @@ class ModelWeightsLoader:
                 logging.error(f'load {weight.name} in layer {layer_id} failed: {e}')
                 raise e
         quant_algo = self._weights_info._quant_algo
+        print("[FEIFEI] _load_layer_weight: id={0:d}, is_group={1:d}, isPerTensor={2:d}, isPerCol={3:d}".format(
+            layer_id,quant_algo.isGroupwise(), quant_algo.isPerTensorQuant(), quant_algo.isWeightOnlyPerCol()))
+        print(layer_weights)
         if quant_algo.isGroupwise():
             results.extend(self._load_groupwise_layer_weight(layer_weights, layer_id=layer_id, device=device))
         elif quant_algo.isSmoothQuant() or quant_algo.isOmniQuant() or quant_algo.isPerTensorQuant():
@@ -515,6 +518,7 @@ class ModelWeightsLoader:
         packer = torch.ops.fastertransformer.pack_int8_tensor_to_packed_int4
         preprocessor = torch.ops.fastertransformer.preprocess_weights_for_mixed_gemm
         is_int8 = weight_bits == 8
+        print("[FEIFEI] preprocess_groupwise_weight_params: is_int8 = {2:d}, gptq = {0:d}, awq = {1:d}".format(gptq, awq, is_int8))
         if is_int8:
             zero_shift = 128
             quant_type = torch.int8
@@ -661,7 +665,8 @@ def estimate_load_parallel_num(config, tp_size):
     model_size = config.eval_model_size()
     cuda_runtime_mem = 2
     weight_compute_mem = 2
-    free_mem = get_mem_info().free / (1024.0 ** 3)
+    #free_mem = get_mem_info().free / (1024.0 ** 3)
+    free_mem = 60 * 1024 * 1024 * 1024 / (1024.0 ** 3)
     model_mem = model_size / tp_size / (1024.0 ** 3)
     parallel_num = int((free_mem - model_mem) / (weight_compute_mem + cuda_runtime_mem))
     parallel_num = min(max(parallel_num, 1), 4) # 以防并发太多影响 io 效率

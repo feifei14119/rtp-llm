@@ -1,4 +1,4 @@
-
+import os
 from maga_transformer.pipeline import Pipeline
 from maga_transformer.model_factory import ModelFactory
 from maga_transformer.openai.openai_endpoint import OpenaiEndopoint
@@ -9,10 +9,24 @@ import asyncio
 import json
 import os
 
+os.environ['USE_NEW_DEVICE_IMPL'] = '1'
+#os.environ['TEST_USING_DEVICE'] = 'CUDA'
+
+use_rpc_model = bool(int(os.environ.get("USE_RPC_MODEL", 0)))
+use_new_device = bool(int(os.environ.get("USE_NEW_DEVICE_IMPL", 0)))
+using_device =os.environ.get("TEST_USING_DEVICE", 0)
+
+print("[FEIFEI]: use_rpc_model = ", use_rpc_model)
+print("[FEIFEI]: use_new_device = ", use_new_device)
+print("[FEIFEI]: using_device = ", using_device)
+
 async def main():
     update_master_info('127.0.0.1', 42345)
     os.environ["MODEL_TYPE"] = os.environ.get("MODEL_TYPE", "qwen2")
-    os.environ["CHECKPOINT_PATH"] = os.environ.get("CHECKPOINT_PATH", "Qwen/Qwen-1_8B-Chat")
+    #os.environ["CHECKPOINT_PATH"] = os.environ.get("CHECKPOINT_PATH", "Qwen/Qwen-1_8B-Chat")
+    #os.environ["CHECKPOINT_PATH"] = os.environ.get("CHECKPOINT_PATH", "Qwen/Qwen2-7B-Instruct-GPTQ-Int4")
+    #os.environ["CHECKPOINT_PATH"] = os.environ.get("CHECKPOINT_PATH", "Qwen/Qwen2-0.5B-Instruct")
+    os.environ["CHECKPOINT_PATH"] = os.environ.get("CHECKPOINT_PATH", "Qwen/Qwen2-0.5B-Instruct-GPTQ-Int4")
 
     model_config = ModelFactory.create_normal_model_config()
     model_config.use_rpc = True
