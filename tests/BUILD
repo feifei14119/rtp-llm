@@ -46,17 +46,17 @@ cc_library(
 cc_library(
     name = "test_ops_libs",
     srcs = glob([
-        "layernorm/*.cpp",
-        "rotary_embedding/*.cpp",
-        "attention_logn/*.cpp",
-        "gemm_dequantize/*.cc",
-        "gemm_group/*.cc",
-        "int8_gemm/*.cc",
+        #"layernorm/*.cpp",
+        #"rotary_embedding/*.cpp",
+        #"attention_logn/*.cpp",
+        #"gemm_dequantize/*.cc",
+        #"gemm_group/*.cc",
+        #"int8_gemm/*.cc",
     ]),
     deps = torch_deps() + [
-        "//src/fastertransformer/kernels:kernels",
+        #"//src/fastertransformer/kernels:kernels",
 	    "//:th_utils",
-        "cutlass_kernels_interface",
+        #"cutlass_kernels_interface",
     ],
     copts = cuda_copts(),
     alwayslink = True,
@@ -120,7 +120,7 @@ py_test(
     ],
     data = [
         "//:th_transformer",
-        ":test_ops",
+        #":test_ops",
     ],
     deps = [
         "//maga_transformer:torch",

@@ -163,7 +163,7 @@ struct ROCmGemmArguments {
 ///          B [b, ..., k, n]
 ///          C [b, ..., m, n]
 
-float cpu_half2float(half h)
+float cpu_half2float(uint16_t h)
 {
   unsigned sign = ((((uint16_t)h) >> 15) & 1);
   unsigned exponent = ((((uint16_t)h) >> 10) & 0x1f);
@@ -220,27 +220,25 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
             size_t type_bits = getTypeBits(params.B.type());
             FT_CHECK((type_bits == 4 || type_bits == 8));
 
-            printf("[GEMM]BufferA_QBufferB_BufferC_2DGemm:TYPE_QINT4X2\n");
             BUFFER_DTYPE_CHECK(params.A, {DataType::TYPE_FP16, DataType::TYPE_BF16});
             BUFFER_DTYPE_CHECK(params.B, {DataType::TYPE_QINT4X2});
 
             const QBuffer& QB  = reinterpret_cast<const QBuffer&>(params.B);
             auto           fpB = allocateBuffer({params.A.type(), {params.B.shape()}, AllocationType::DEVICE}, {"fpB"});
 
+            printf("[GEMM]BufferA_QBufferB_BufferC_2DGemm:TYPE_QINT4X2\n");
             printf("[GEMM] A = %s\n", params.A.debugString().c_str());
             printf("[GEMM] kernel = %s\n", QB.kernel().debugString().c_str());
             printf("[GEMM] scales = %s\n", QB.scales().debugString().c_str());
             printf("[GEMM] zeros = %s\n", QB.zeros().debugString().c_str());
-            if(QB.kernel().shape()[0] != QB.scales().shape()[0] * 128)
-                printf("[GEMM] GEMM_ERROR group_scale not 128\n");
 
             // dequant B
             DISPATCH_CUDA_FUNCTION_DATA_TYPE(params.A.type(),
-                                             invokePerRowDequantizationInt4x2,
+                                             invokePerColDequantizationInt4x2,
                                              fpB.get()->data(),
                                              (int8_t*)(QB.kernel().data()),
-                                             arguments.n,
                                              arguments.k,
+                                             arguments.n,
                                              QB.scales().data<half>(),
                                              QB.zeros().data<half>(),
                                              group_size,
@@ -260,6 +258,61 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
             auto computeType = dtypeConvert(arguments.DDtype);
             
             printf("[GEMM] n = %d, m = %d, k = %d\n", arguments.n, arguments.m, arguments.k);
+            printf("[GEMM] ldc = %d, stride_c = %d, batch_size = %d\n", arguments.ldc, arguments.stride_c, arguments.batch_size);
+            /*printf("------------------------------------\n");
+            BufferPtr hB = clone({QB.kernel(), AllocationType::HOST});
+            int8_t* phB = (int8_t*)(hB.get()->data());
+            size_t Bsz = QB.kernel().size();
+            for(size_t i = 0; i < Bsz; i++)
+            {
+                if(i%8 == 0) printf("\n");
+                int8_t tmpu8 = phB[i];
+                printf("%d, ", tmpu8);
+            }
+            printf("\n------------------------------------\n");*/
+            /*printf("------------------------------------\n");
+            printf("[GEMM] int4 = %s\n", QB.kernel().debugString().c_str());
+            BufferPtr hB = clone({QB.kernel(), AllocationType::HOST});
+            uint8_t* phB = (uint8_t*)(hB.get()->data());
+            size_t Bsz = QB.kernel().size();
+            for(size_t i = 0; i < Bsz/2; i++)
+            {
+                if(i%(QB.kernel().shape()[1]/2) == 0) printf("\n");
+                uint8_t tmpu8 = phB[i];
+                uint8_t tmpu4l = tmpu8 & 0x0F;
+                uint8_t tmpu4h = (tmpu8 & 0xF0) >> 4;
+                if(tmpu4l & 0x08) tmpu4l|= 0xF0;
+                if(tmpu4h & 0x08) tmpu4h|= 0xF0;
+                int8_t tmpi4l = tmpu4l;
+                int8_t tmpi4h = tmpu4h;
+                printf("%d, %d, ", tmpi4l, tmpi4h);
+            }
+            printf("\n------------------------------------\n");*/
+            /*printf("------------------------------------\n");
+            printf("[GEMM] scale = %s\n", QB.scales().debugString().c_str());
+            BufferPtr hB = clone({QB.scales(), AllocationType::HOST});
+            uint16_t* phB = (uint16_t*)(hB.get()->data());
+            size_t Bsz = QB.scales().size();
+            for(size_t i = 0; i < Bsz; i++)
+            {
+                if(i%(QB.scales().shape()[1]) == 0) printf("\n");
+                printf("%.2e, ", cpu_half2float(phB[i]));
+            }
+            printf("\n------------------------------------\n");*/
+            /*printf("------------------------------------\n");
+            printf("[GEMM] dequantB = %s\n", fpB.get()->debugString().c_str());
+            BufferPtr hB = clone({*fpB.get(), AllocationType::HOST});
+            uint16_t* phB = (uint16_t*)(hB.get()->data());
+            size_t Bsz = fpB.get()->size();
+            for(size_t i = 0; i < Bsz; i++)
+            {
+                if(i%(fpB.get()->shape()[1]) == 0) printf("\n");
+                printf("%.2e, ", cpu_half2float(phB[i]));
+            }
+            printf("\n------------------------------------\n");*/
+            //std::exit(0);
+
+#if 1 // B * A
             hipblas_mm_wrapper_->stridedBatchedGemm(b_op,
                                                     a_op,
                                                     arguments.n,
@@ -281,7 +334,43 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
                                                     arguments.stride_c,
                                                     arguments.batch_size,
                                                     computeType);
-            printf("[GEMM] D = %s\n", output.get()->debugString().c_str());
+#else
+            hipblas_mm_wrapper_->stridedBatchedGemm(a_op,
+                                                    b_op,
+                                                    arguments.m,
+                                                    arguments.n,
+                                                    arguments.k,
+                                                    arguments.alpha,
+                                                    A,
+                                                    A_data_type,
+                                                    arguments.lda,
+                                                    arguments.stride_a,
+                                                    B,
+                                                    B_data_type,
+                                                    arguments.ldb,
+                                                    arguments.stride_b,
+                                                    arguments.beta,
+                                                    D,
+                                                    D_data_type,
+                                                    arguments.ldc,
+                                                    arguments.stride_c,
+                                                    arguments.batch_size,
+                                                    computeType);
+#endif                                                    
+
+
+            /*printf("------------------------------------\n");
+            printf("[GEMM] output = %s\n", output.get()->debugString().c_str());
+            BufferPtr hD = clone({*output.get(), AllocationType::HOST});
+            uint16_t* phD = (uint16_t*)(hD.get()->data());
+            size_t Dsz = output.get()->size();
+            for(size_t i = 0; i < Dsz; i++)
+            {
+                if(i%(output.get()->shape()[1]) == 0) printf("\n");
+                printf("%.2e, ", cpu_half2float(phD[i]));
+            }
+            printf("\n------------------------------------\n");*/
+            //std::exit(0);
 
             sync_check_cuda_error();
             return move(output);
@@ -443,7 +532,6 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
     }
 
     if (ROCmGemmDispatch::dispatch(params) == GemmImplementType::hipblas_basic_gemm) {
-        printf("[GEMM]hipblas_basic_gemm\n");
 
         const auto A    = params.A.data();
         const auto B    = params.B.data();
@@ -455,25 +543,36 @@ BufferPtr ROCmDevice::gemm(const GemmParams& params) {
             b_op, a_op, arguments.n, arguments.m, arguments.k, B, arguments.ldb, A, arguments.lda, D, arguments.ldc);
         sync_check_hip_error();
 
-
+        printf("[GEMM]hipblas_basic_gemm\n");
         printf("[GEMM] A = %s\n", params.A.debugString().c_str());
         printf("[GEMM] B = %s\n", params.B.debugString().c_str());
         printf("[GEMM] D = %s\n", output.get()->debugString().c_str());
         printf("[GEMM] n = %d, m = %d, k = %d\n", arguments.n, arguments.m, arguments.k);
-
+        printf("[GEMM] ldc = %d, stride_c = %d, batch_size = %d\n", arguments.ldc, arguments.stride_c, arguments.batch_size);
         /*printf("------------------------------------\n");
+        printf("[GEMM] output = %s\n", params.B.debugString().c_str());
         BufferPtr hB = clone({params.B, AllocationType::HOST});
-        //half* phB = hB.get()->data<half>();
-        half* phB = (half*)A;
-        size_t hBsz = params.A.size();
-        for(size_t i = 0; i < hBsz; i++)
+        uint16_t* phB = (uint16_t*)(hB.get()->data());
+        size_t Bsz = params.B.size();
+        for(size_t i = 0; i < Bsz; i++)
         {
-            if(i%16 == 0) printf("\n");
+            if(i%(hB.get()->shape()[1]) == 0) printf("\n");
             printf("%.2e, ", cpu_half2float(phB[i]));
         }
         printf("\n------------------------------------\n");*/
-
+        /*printf("------------------------------------\n");
+        printf("[GEMM] output = %s\n", output.get()->debugString().c_str());
+        BufferPtr hB = clone({*output.get(), AllocationType::HOST});
+        uint16_t* phB = (uint16_t*)(hB.get()->data());
+        size_t Bsz = output.get()->size();
+        for(size_t i = 0; i < Bsz; i++)
+        {
+            if(i%(hB.get()->shape()[1]) == 0) printf("\n");
+            printf("%.2e, ", cpu_half2float(phB[i]));
+        }
+        printf("\n------------------------------------\n");*/
         //std::exit(0);
+
         return std::move(output);
     } else if (ROCmGemmDispatch::dispatch(params) == GemmImplementType::hipblas_batch_gemm) {
 

@@ -1,0 +1,657 @@
+[1mdiff --git a/.bazelrc b/.bazelrc[m
+[1mindex f511544..85ad9b4 100644[m
+[1m--- a/.bazelrc[m
+[1m+++ b/.bazelrc[m
+[36m@@ -21,8 +21,8 @@[m [mbuild --copt="-DBUILD_CUTLASS_MIXED_GEMM=ON"[m
+ build --copt="-DC10_CUDA_NO_CMAKE_CONFIGURE_FILE"[m
+ [m
+ build --copt="-DUSE_NVTX=ON"[m
+[31m-build --copt="-DUSING_CUDA=1"[m
+[31m-build --copt="-DENABLE_BF16=1"[m
+[32m+[m[32m#build --copt="-DUSING_CUDA=1"[m
+[32m+[m[32mbuild --copt="-DENABLE_BF16=0"[m
+ build --linkopt="-lm"[m
+ build --define=using_cuda=true --define=using_cuda_nvcc=true[m
+ build --crosstool_top=@local_config_cuda//crosstool:toolchain[m
+[36m@@ -83,6 +83,7 @@[m [mbuild:rocm --define=using_cuda=false --define=using_cuda_nvcc=false[m
+ build:rocm --define=using_rocm=true --define=using_rocm_hipcc=true[m
+ build:rocm --action_env TF_NEED_ROCM=1[m
+ build:rocm --copt="-DUSING_CUDA=0"[m
+[32m+[m[32mbuild:rocm --copt="-D__HIP_PLATFORM_AMD__=1"[m
+ [m
+ build:debug -c dbg[m
+ build:debug --copt -g --copt -O0[m
+[1mdiff --git a/src/fastertransformer/devices/DeviceBase.h b/src/fastertransformer/devices/DeviceBase.h[m
+[1mindex 01c8791..6ba5429 100644[m
+[1m--- a/src/fastertransformer/devices/DeviceBase.h[m
+[1m+++ b/src/fastertransformer/devices/DeviceBase.h[m
+[36m@@ -44,7 +44,7 @@[m [mprivate:[m
+     virtual IAllocator* getAllocator() = 0;[m
+     virtual IAllocator* getHostAllocator() = 0;[m
+ [m
+[31m-protected:[m
+[32m+[m[32mpublic:[m
+     int device_id_;[m
+     DeviceInitParams init_params_;[m
+ [m
+[1mdiff --git a/src/fastertransformer/devices/DeviceOps.cc b/src/fastertransformer/devices/DeviceOps.cc[m
+[1mindex 6d67b84..50c9a99 100644[m
+[1m--- a/src/fastertransformer/devices/DeviceOps.cc[m
+[1m+++ b/src/fastertransformer/devices/DeviceOps.cc[m
+[36m@@ -35,6 +35,7 @@[m [mLayernormOutput DeviceOps::layernorm(const LayernormParams& params) {[m
+ }[m
+ [m
+ BufferPtr DeviceOps::gemm(const GemmParams& params) {[m
+[32m+[m[32m    printf("\n!!!!!!!!!gemm NOT here!!!!!!!!!!!!!!!\n");[m
+     throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);[m
+ }[m
+ [m
+[1mdiff --git a/src/fastertransformer/devices/base_tests/GemmOpTest.hpp b/src/fastertransformer/devices/base_tests/GemmOpTest.hpp[m
+[1mindex 76a18ce..20d5806 100644[m
+[1m--- a/src/fastertransformer/devices/base_tests/GemmOpTest.hpp[m
+[1m+++ b/src/fastertransformer/devices/base_tests/GemmOpTest.hpp[m
+[36m@@ -147,6 +147,7 @@[m [mpublic:[m
+                          size_t k,[m
+                          DataType dtype)[m
+     {[m
+[32m+[m[32m        printf("/n**************BasicGemmOpTest*************/n");[m
+         auto input = PrepareGemmOpInput(m, n, k, dtype);[m
+         auto result = BasicGemmOpRun(input);[m
+         auto result_ref = BasicGemmTorchRefRun(input);[m
+[1mdiff --git a/src/fastertransformer/devices/cpu_impl/CpuDevice.cc b/src/fastertransformer/devices/cpu_impl/CpuDevice.cc[m
+[1mindex 6f3b656..14cf21f 100644[m
+[1m--- a/src/fastertransformer/devices/cpu_impl/CpuDevice.cc[m
+[1m+++ b/src/fastertransformer/devices/cpu_impl/CpuDevice.cc[m
+[36m@@ -42,6 +42,7 @@[m [mLayernormOutput CpuDevice::layernorm(const LayernormParams& params) {[m
+ }[m
+ [m
+ BufferPtr CpuDevice::gemm(const GemmParams& params) {[m
+[32m+[m[32m    printf("\n!!!!!!!!!gemm NOT here!!!!!!!!!!!!!!!\n");[m
+     throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);[m
+ }[m
+ [m
+[1mdiff --git a/src/fastertransformer/devices/cuda_impl/CudaGemmOp.cc b/src/fastertransformer/devices/cuda_impl/CudaGemmOp.cc[m
+[1mindex a49c9ed..43ed2b7 100644[m
+[1m--- a/src/fastertransformer/devices/cuda_impl/CudaGemmOp.cc[m
+[1m+++ b/src/fastertransformer/devices/cuda_impl/CudaGemmOp.cc[m
+[36m@@ -159,6 +159,7 @@[m [mstruct CudaGemmArguments {[m
+ ///          B [b, ..., k, n][m
+ ///          C [b, ..., m, n][m
+ BufferPtr CudaDevice::gemm(const GemmParams& params) {[m
+[32m+[m[32m    printf("\n!!!!!!!!!gemm NOT here!!!!!!!!!!!!!!!\n");[m
+     params.check();[m
+ [m
+     using GemmImplementType = CudaGemmDispatch::GemmImplementType;[m
+[1mdiff --git a/src/fastertransformer/devices/rocm_impl/BUILD b/src/fastertransformer/devices/rocm_impl/BUILD[m
+[1mindex 58ab51d..9dda3cf 100644[m
+[1m--- a/src/fastertransformer/devices/rocm_impl/BUILD[m
+[1m+++ b/src/fastertransformer/devices/rocm_impl/BUILD[m
+[36m@@ -15,6 +15,7 @@[m [mcc_library([m
+         "@local_config_rocm//rocm:rocm_headers",[m
+         "@local_config_rocm//rocm:rocblas",[m
+         "//src/fastertransformer/kernels:gpt_kernels_rocm",[m
+[32m+[m[32m        "//src/fastertransformer/rocm:rocm_utils",[m
+     ],[m
+     visibility = ["//visibility:public"],[m
+     copts = rocm_copts(),[m
+[1mdiff --git a/src/fastertransformer/devices/rocm_impl/ROCmDevice.cc b/src/fastertransformer/devices/rocm_impl/ROCmDevice.cc[m
+[1mindex 0b8fdef..edc7adb 100644[m
+[1m--- a/src/fastertransformer/devices/rocm_impl/ROCmDevice.cc[m
+[1m+++ b/src/fastertransformer/devices/rocm_impl/ROCmDevice.cc[m
+[36m@@ -1,21 +1,24 @@[m
+ #include "src/fastertransformer/devices/rocm_impl/ROCmDevice.h"[m
+ #include "src/fastertransformer/devices/rocm_impl/ROCmAllocator.h"[m
+ #include "src/fastertransformer/devices/DeviceFactory.h"[m
+[31m-#include "src/fastertransformer/kernels/gpt_kernels.h"[m
+[31m-#include "src/fastertransformer/kernels/layernorm_kernels.h"[m
+[31m-#include "src/fastertransformer/kernels/rmsnormKernels.h"[m
+[31m-#include "src/fastertransformer/kernels/add_residual_kernels.h"[m
+[31m-#include "src/fastertransformer/kernels/activation_kernels.h"[m
+[31m-#include "src/fastertransformer/cuda/Dispatch.h"[m
+[32m+[m
+[32m+[m[32m//#include "src/fastertransformer/kernels/gpt_kernels.h"[m
+[32m+[m[32m//#include "src/fastertransformer/kernels/layernorm_kernels.h"[m
+[32m+[m[32m//#include "src/fastertransformer/kernels/rmsnormKernels.h"[m
+[32m+[m[32m//#include "src/fastertransformer/kernels/add_residual_kernels.h"[m
+[32m+[m[32m//#include "src/fastertransformer/kernels/activation_kernels.h"[m
+[32m+[m
+[32m+[m[32m//#include "src/fastertransformer/Dispatch.h"[m
+[32m+[m
+ #include "src/fastertransformer/utils/ShapeCheck.h"[m
+ #include <cstring>[m
+ [m
+ #include <hip/hip_runtime.h>[m
+ [m
+ // TODO(rocm): Idealy we just link compiler_rt for this symbol.[m
+[31m-extern "C" half __truncdfhf2(double a) {[m
+[31m-    return (half)(float)a;[m
+[31m-}[m
+[32m+[m[32m//extern "C" half __truncdfhf2(double a) {[m
+[32m+[m[32m//    return (half)(float)a;[m
+[32m+[m[32m//}[m
+ [m
+ namespace fastertransformer {[m
+ [m
+[36m@@ -23,13 +26,52 @@[m [mROCmDevice::ROCmDevice(const DeviceInitParams& params): DeviceBase(params) {[m
+     RUNTIME_ASSERT_OP_ARG(params.tp_rank == 0, "rocm device doesn't support nccl");[m
+     // RUNTIME_ASSERT_OP_ARG(params.host_reserve_memory_bytes == 0, "rocm device doesn't reserve host memory");[m
+     // RUNTIME_ASSERT_OP_ARG(params.device_reserve_memory_bytes == 0, "rocm device doesn't reserve device memory");[m
+[32m+[m[41m    [m
+[32m+[m[32m    printf("\n**************ROCmDevice *************\n");[m
+[32m+[m
+     allocator_.reset(new Allocator<AllocatorType::ROCM>());[m
+     hostAllocator_.reset(new Allocator<AllocatorType::ROCM_HOST>());[m
+     (void)hipSetDevice(0);[m
+     (void)hipStreamCreate(&stream_);[m
+[32m+[m
+[32m+[m[32m    printf("\n------------hipblasCreate -----------------\n");[m
+[32m+[m[32m    hipblasCreate(&hipblas_handle_);[m
+[32m+[m[32m    printf("\n------------hipblasLtCreate -----------------\n");[m
+[32m+[m[32m    hipblasLtCreate(&hipblaslt_handle_);[m
+[32m+[m[32m    printf("\n------------hipGetDeviceProperties -----------------\n");[m
+[32m+[m[32m    hipGetDeviceProperties(&device_prop_, device_id_);[m
+[32m+[m
+[32m+[m[32m    printf("\n------------hipblas_algo_map_ -----------------\n");[m
+[32m+[m[32m    hipblas_algo_map_.reset(new rocm::cublasAlgoMap());[m
+[32m+[m
+[32m+[m[32m    if(hipblas_algo_map_.get() == nullptr)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        printf("\n------------hipblas_algo_map_ nullptr -----------------\n");[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if(allocator_.get() == nullptr)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        printf("\n------------allocator_ nullptr -----------------\n");[m
+[32m+[m[32m    }[m
+[32m+[m[32m    printf("\n------------hipblas_mm_wrapper_ -----------------\n");[m
+[32m+[m[32m   hipblas_mm_wrapper_.reset([m
+[32m+[m[32m       new hipblasMMWrapper(hipblas_handle_,[m[41m [m
+[32m+[m[32m                            hipblaslt_handle_,[m[41m [m
+[32m+[m[32m                            stream_,[m[41m [m
+[32m+[m[32m                            hipblas_algo_map_.get(),[m
+[32m+[m[32m                            &hipblas_wrapper_mutex_,[m[41m [m
+[32m+[m[32m                            allocator_.get()));[m
+[32m+[m[32m   //hipblas_mm_wrapper_->setGemmConfig(CUDA_R_16F, CUDA_R_16F, CUDA_R_16F, CUDA_R_32F);[m
+[32m+[m
+[32m+[m
+[32m+[m[32m    printf("\n**************ROCmDevice END*************\n");[m
+ }[m
+ [m
+ ROCmDevice::~ROCmDevice() {[m
+[32m+[m[32m    hipblas_mm_wrapper_.reset();[m
+[32m+[m[32m    hipStreamDestroy(stream_);[m
+[32m+[m[32m    hipblasDestroy(hipblas_handle_);[m
+[32m+[m[32m    hipblasLtDestroy(hipblaslt_handle_);[m
+[32m+[m
+     if (stream_ != nullptr) {[m
+         (void)hipStreamDestroy(stream_);[m
+     }[m
+[36m@@ -97,112 +139,6 @@[m [mvoid ROCmDevice::syncAndCheck() {[m
+     (void)hipDeviceSynchronize();[m
+ }[m
+ [m
+[31m-struct GemmArguments {[m
+[31m-    std::vector<size_t> Ashape;[m
+[31m-    std::vector<size_t> Bshape;[m
+[31m-    std::vector<size_t> Cshape;[m
+[31m-    std::vector<size_t> Dshape;[m
+[31m-[m
+[31m-    DataType ADtype;[m
+[31m-    DataType BDtype;[m
+[31m-    DataType CDtype;[m
+[31m-    DataType DDtype;[m
+[31m-[m
+[31m-    size_t dim;[m
+[31m-    size_t batch_size;[m
+[31m-    size_t m;[m
+[31m-    size_t k;[m
+[31m-    size_t n;[m
+[31m-[m
+[31m-    float alpha = 1.0f;[m
+[31m-    float beta  = 0.0f;[m
+[31m-[m
+[31m-    size_t lda;[m
+[31m-    size_t stride_a;[m
+[31m-    size_t ldb;[m
+[31m-    size_t stride_b;[m
+[31m-    size_t ldc;[m
+[31m-    size_t stride_c;[m
+[31m-[m
+[31m-    GemmArguments(const GemmParams& params) {[m
+[31m-[m
+[31m-        Ashape = params.A.shape();[m
+[31m-        Bshape = params.B.shape();[m
+[31m-[m
+[31m-        if (params.transA == TransposeOperation::TRANSPOSE) {[m
+[31m-            std::iter_swap(Ashape.end() - 1, Ashape.end() - 2);[m
+[31m-        }[m
+[31m-[m
+[31m-        if (params.transB == TransposeOperation::TRANSPOSE) {[m
+[31m-            std::iter_swap(Bshape.end() - 1, Bshape.end() - 2);[m
+[31m-        }[m
+[31m-[m
+[31m-        if (params.C != std::nullopt) {[m
+[31m-            Cshape = params.C.value().get().shape();[m
+[31m-        }[m
+[31m-[m
+[31m-        ADtype = params.A.type();[m
+[31m-        BDtype = params.A.type();[m
+[31m-        if (params.C != std::nullopt) {[m
+[31m-            CDtype = params.C.value().get().type();[m
+[31m-        }[m
+[31m-        DDtype = (params.compute_type == DataType::TYPE_INVALID) ? params.A.type() : params.compute_type;[m
+[31m-[m
+[31m-        dim        = params.A.dim();[m
+[31m-        batch_size = std::accumulate(Ashape.begin(), Ashape.end() - 2, (size_t)1, std::multiplies<size_t>());[m
+[31m-[m
+[31m-        m = Ashape[dim - 2];[m
+[31m-        k = Ashape[dim - 1];[m
+[31m-        n = Bshape[dim - 1];[m
+[31m-[m
+[31m-        Dshape = std::vector<size_t>(Ashape.begin(), Ashape.end() - 2);[m
+[31m-        Dshape.insert(Dshape.end(), {m, n});[m
+[31m-[m
+[31m-        lda      = params.A.shape()[dim - 1];[m
+[31m-        stride_a = m * k;[m
+[31m-        ldb      = params.B.shape()[dim - 1];[m
+[31m-        stride_b = k * n;[m
+[31m-        ldc      = n;[m
+[31m-        stride_c = m * n;[m
+[31m-    }[m
+[31m-[m
+[31m-    void dump() {[m
+[31m-        std::cerr << "Ashape is : " << ShapeStringView(Ashape) << "\n"[m
+[31m-                  << "Bshape is : " << ShapeStringView(Bshape) << "\n"[m
+[31m-                  << "Cshape is : " << ShapeStringView(Cshape) << "\n"[m
+[31m-                  << "Dshape is : " << ShapeStringView(Dshape) << "\n"[m
+[31m-                  << "dim is : " << dim << "\n"[m
+[31m-                  << "batch size is : " << batch_size << "\n"[m
+[31m-                  << "m is : " << m << "\n"[m
+[31m-                  << "n is : " << n << "\n"[m
+[31m-                  << "k is : " << k << "\n"[m
+[31m-                  << "lda is : " << lda << "\n"[m
+[31m-                  << "ldb is : " << ldb << "\n"[m
+[31m-                  << "ldc is : " << ldc << "\n"[m
+[31m-                  << "stride_a is : " << stride_a << "\n"[m
+[31m-                  << "stride_b is : " << stride_b << "\n"[m
+[31m-                  << "stride_c is : " << stride_c << "\n"[m
+[31m-                  << std::endl;[m
+[31m-    }[m
+[31m-};[m
+[31m-[m
+[31m-BufferPtr ROCmDevice::gemm(const GemmParams& params) {[m
+[31m-    params.check();[m
+[31m-[m
+[31m-    GemmArguments arguments(params);[m
+[31m-[m
+[31m-    std::cerr << "gemm " << int(params.A.type()) << " " << int(params.compute_type) << '\n';[m
+[31m-    arguments.dump();[m
+[31m-[m
+[31m-    BufferPtr output;[m
+[31m-    if (params.D) {[m
+[31m-        output = params.D;[m
+[31m-    } else {[m
+[31m-        output = allocateBuffer({arguments.DDtype, arguments.Dshape, AllocationType::DEVICE}, {"gemm_output"});[m
+[31m-    }[m
+[31m-    return output;[m
+[31m-}[m
+[31m-[m
+ SelectOutput ROCmDevice::select(const SelectParams& params) {[m
+     if ((params.input.where() != MemoryType::MEMORY_GPU) || (params.dim > 0)) {[m
+         return DeviceBase::select(params);[m
+[36m@@ -216,6 +152,7 @@[m [mSelectOutput ROCmDevice::select(const SelectParams& params) {[m
+     output_shape[0]           = params.index.size();[m
+     auto num_selected_element = input.size() / input.shape()[0];[m
+     auto output               = allocateBuffer({input.type(), output_shape});[m
+[32m+[m[32m    /*[m
+     DISPATCH_CUDA_FUNCTION_DATA_TYPE(input.type(),[m
+                                      invokeLookupHiddenStateOfLastToken,[m
+                                      output->data(),[m
+[36m@@ -224,7 +161,7 @@[m [mSelectOutput ROCmDevice::select(const SelectParams& params) {[m
+                                      (int)params.index.size(),[m
+                                      num_selected_element,[m
+                                      0,[m
+[31m-                                     stream_);[m
+[32m+[m[32m                                     stream_);*/[m
+     return std::move(output);[m
+ }[m
+ [m
+[36m@@ -242,7 +179,7 @@[m [mBufferPtr ROCmDevice::embeddingLookup(const EmbeddingLookupParams& params) {[m
+ [m
+     auto embeddings = allocateBuffer({data_type, {token_num, hidden_size}}, {"embedding"});[m
+ [m
+[31m-    DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+[32m+[m[32m    /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+                                      invokeEmebeddingLookup,[m
+                                      embeddings->data(),[m
+                                      embedding_table.data(),[m
+[36m@@ -254,7 +191,7 @@[m [mBufferPtr ROCmDevice::embeddingLookup(const EmbeddingLookupParams& params) {[m
+                                      token_types.has_value() ? token_types.value().get().data<int>() : nullptr,[m
+                                      token_num,[m
+                                      hidden_size,[m
+[31m-                                     stream_);[m
+[32m+[m[32m                                     stream_);*/[m
+ [m
+     return std::move(embeddings);[m
+ }[m
+[36m@@ -275,7 +212,7 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+     if (!weights.has_value()) {[m
+         if (params.alpha.has_value() || (norm_type == NormType::alphanorm)) {[m
+             const auto alpha = params.alpha.value_or(1.0f);[m
+[31m-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+[32m+[m[32m            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+                                              invokeAlphaAddBiasResidual,[m
+                                              output.data(),[m
+                                              input.data(),[m
+[36m@@ -284,9 +221,9 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+                                              alpha,[m
+                                              m,[m
+                                              n,[m
+[31m-                                             stream_);[m
+[32m+[m[32m                                             stream_);*/[m
+         } else if (params.bias.has_value() || params.residual1.has_value() || params.residual2.has_value()) {[m
+[31m-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+[32m+[m[32m            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+                                              invokeAddBiasResidual,[m
+                                              output.data(),[m
+                                              input.data(),[m
+[36m@@ -297,7 +234,7 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+                                              nullptr,  // scale_out[m
+                                              m,[m
+                                              n,[m
+[31m-                                             stream_);[m
+[32m+[m[32m                                             stream_);*/[m
+         } else {[m
+             throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);[m
+         }[m
+[36m@@ -310,7 +247,7 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+     if (params.residual1.has_value() || params.bias.has_value()) {[m
+         const auto& add_bias_output = params.add_bias_output ? params.add_bias_output.value().get() : output;[m
+         if (params.norm_type == NormType::layernorm) {[m
+[31m-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+[32m+[m[32m            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+                                              invokeGeneralAddBiasResidualLayerNorm,[m
+                                              add_bias_output.data(),[m
+                                              output.data(),[m
+[36m@@ -327,9 +264,9 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+                                              nullptr,  // scale[m
+                                              nullptr,  // dynamic_scale[m
+                                              nullptr   // out_quant[m
+[31m-            );[m
+[32m+[m[32m            );*/[m
+         } else if (params.norm_type == NormType::rmsnorm) {[m
+[31m-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+[32m+[m[32m            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+                                              invokeAddBiasResidualRmsNorm,[m
+                                              add_bias_output.data(),[m
+                                              output.data(),[m
+[36m@@ -345,13 +282,13 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+                                              nullptr,  // scale[m
+                                              nullptr,  // dynamic_scale[m
+                                              nullptr   // out_quant[m
+[31m-            );[m
+[32m+[m[32m            );*/[m
+         } else {[m
+             throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);[m
+         }[m
+     } else {[m
+         if (params.norm_type == NormType::layernorm) {[m
+[31m-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+[32m+[m[32m            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+                                              invokeGeneralLayerNorm,[m
+                                              output.data(),[m
+                                              input.data(),[m
+[36m@@ -365,9 +302,9 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+                                              nullptr,  // scale[m
+                                              nullptr,  // dynamic_scale[m
+                                              nullptr   // out_quant[m
+[31m-            );[m
+[32m+[m[32m            );*/[m
+         } else if (params.norm_type == NormType::rmsnorm) {[m
+[31m-            DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+[32m+[m[32m            /*DISPATCH_CUDA_FUNCTION_DATA_TYPE(data_type,[m
+                                              invokeGeneralRmsNorm,[m
+                                              output.data(),[m
+                                              input.data(),[m
+[36m@@ -380,7 +317,7 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+                                              nullptr,  // scale[m
+                                              nullptr,  // dynamic_scale[m
+                                              nullptr   // out_quant[m
+[31m-            );[m
+[32m+[m[32m            );*/[m
+         } else {[m
+             throw OpException(OpErrorType::ERROR_UNIMPLEMENTED);[m
+         }[m
+[36m@@ -388,6 +325,11 @@[m [mLayernormOutput ROCmDevice::layernorm(const LayernormParams& params) {[m
+     return;[m
+ }[m
+ [m
+[32m+[m[32m//BufferPtr ROCmDevice::gemm(const GemmParams& params) {[m
+[32m+[m[32m//    printf("\n**************gemm*************\n");[m
+[32m+[m[32m//    return nullptr;[m
+[32m+[m[32m//}[m
+[32m+[m
+ #define ARGS_DISPATCH(Atype, Dtype, out, bias, gate, gate_bias, m, n, stream)                                          \[m
+     do {                                                                                                               \[m
+         invokeGenericActivation<Atype>((Dtype*)out,                                                                    \[m
+[36m@@ -453,7 +395,7 @@[m [mvoid ROCmDevice::activation(const ActivationParams& params) {[m
+         gate_bias = params.gate_bias.value().get().data();[m
+     }[m
+ [m
+[31m-    DISPATCH(states.type(), params.atype, states.data(), bias, gate, gate_bias, m, n, stream_);[m
+[32m+[m[32m    //DISPATCH(states.type(), params.atype, states.data(), bias, gate, gate_bias, m, n, stream_);[m
+ }[m
+ [m
+ AttentionModuleOutput ROCmDevice::contextAttention(const AttentionModuleParams& params) {[m
+[1mdiff --git a/src/fastertransformer/devices/rocm_impl/ROCmDevice.h b/src/fastertransformer/devices/rocm_impl/ROCmDevice.h[m
+[1mindex 1a2271f..f3bdb06 100644[m
+[1m--- a/src/fastertransformer/devices/rocm_impl/ROCmDevice.h[m
+[1m+++ b/src/fastertransformer/devices/rocm_impl/ROCmDevice.h[m
+[36m@@ -1,7 +1,13 @@[m
+ #pragma once[m
+ [m
+[32m+[m[32m#include <hip/hip_runtime.h>[m
+[32m+[m[32m#if ENABLE_BF16[m
+[32m+[m[32m#include <hip/hip_fp16.h>[m
+[32m+[m[32m#endif[m
+ #include "src/fastertransformer/devices/DeviceBase.h"[m
+ [m
+[32m+[m[32m#include "src/fastertransformer/rocm/hipblasMMWrapper.h"[m
+[32m+[m
+ namespace fastertransformer {[m
+ [m
+ class ROCmDevice : public DeviceBase {[m
+[36m@@ -14,17 +20,30 @@[m [mpublic:[m
+     IAllocator* getHostAllocator() override { return hostAllocator_.get(); }[m
+     void copy(const CopyParams& params) override;[m
+     void syncAndCheck() override;[m
+[31m-    BufferPtr gemm(const GemmParams& params) override;[m
+[32m+[m[32m    BufferPtr gemm(const GemmParams& params);[m
+     SelectOutput select(const SelectParams& params) override;[m
+     BufferPtr embeddingLookup(const EmbeddingLookupParams& params) override;[m
+     LayernormOutput layernorm(const LayernormParams& params) override;[m
+     void activation(const ActivationParams& params) override;[m
+     AttentionModuleOutput contextAttention(const AttentionModuleParams& params) override;[m
+ [m
+[32m+[m[32mpublic:[m
+[32m+[m
+[32m+[m[32m    hipblasMMWrapper* hipblasMMWrapperPtr() const {return hipblas_mm_wrapper_.get();}[m
+[32m+[m
+[32m+[m
+ private:[m
+     std::unique_ptr<IAllocator> allocator_;[m
+     std::unique_ptr<IAllocator> hostAllocator_;[m
+     hipStream_t stream_ = nullptr;[m
+[32m+[m
+[32m+[m[32m    std::mutex hipblas_wrapper_mutex_;[m
+[32m+[m[32m    hipblasHandle_t hipblas_handle_;[m
+[32m+[m[32m    hipblasLtHandle_t hipblaslt_handle_;[m
+[32m+[m[32m    hipDeviceProp_t device_prop_;[m
+[32m+[m
+[32m+[m[32m    std::unique_ptr<rocm::cublasAlgoMap> hipblas_algo_map_;[m
+[32m+[m[32m    std::unique_ptr<hipblasMMWrapper> hipblas_mm_wrapper_;[m
+ };[m
+ [m
+ } // namespace fastertransformer[m
+[1mdiff --git a/src/fastertransformer/devices/rocm_impl/test/BUILD b/src/fastertransformer/devices/rocm_impl/test/BUILD[m
+[1mindex 46f6876..db0a2cb 100644[m
+[1m--- a/src/fastertransformer/devices/rocm_impl/test/BUILD[m
+[1m+++ b/src/fastertransformer/devices/rocm_impl/test/BUILD[m
+[36m@@ -1,4 +1,4 @@[m
+[31m-load("//:def.bzl", "copts", "torch_deps")[m
+[32m+[m[32mload("//:def.bzl", "copts", "torch_deps", "rocm_copts")[m
+ load("//src/fastertransformer/devices:device_defs.bzl",[m
+     "device_impl_target", "device_test_envs", "device_linkopts")[m
+ [m
+[36m@@ -9,15 +9,20 @@[m [mtest_copts = [[m
+ test_linkopts = [[m
+     "-lpython3.10",[m
+     "-ltorch",[m
+[32m+[m[32m    "-L/opt/rocm/lib",[m
+[32m+[m[32m    "-lrocblas",[m
+[32m+[m[32m    "-lhipblas",[m
+[32m+[m[32m    "-lhipblaslt",[m
+ ][m
+ [m
+ test_deps = [[m
+     "//src/fastertransformer/devices/rocm_impl:rocm_impl",[m
+     "//src/fastertransformer/devices/testing:device_test_utils",[m
+     "//src/fastertransformer/devices/base_tests:base_tests",[m
+[32m+[m[32m    "@local_config_rocm//rocm:rocm_headers",[m
+[32m+[m[32m    "@local_config_rocm//rocm:rocblas",[m
+ ] + torch_deps()[m
+ [m
+[31m-[m
+ cc_test([m
+     name = "rocm_basic_test",[m
+     srcs = [],[m
+[36m@@ -42,3 +47,27 @@[m [mcc_test([m
+     deps = test_deps,[m
+     tags = ["rocm"],[m
+ )[m
+[32m+[m
+[32m+[m[32mcc_test([m
+[32m+[m[32m    name = "gemm_op_test",[m
+[32m+[m[32m    srcs = [[m
+[32m+[m[32m        "ops/ROCmGemmOpTest.cc",[m
+[32m+[m[32m    ],[m
+[32m+[m[32m    data = [],[m
+[32m+[m[32m    env = device_test_envs(),[m
+[32m+[m[32m    copts = test_copts + copts(),[m
+[32m+[m[32m    linkopts = test_linkopts,[m
+[32m+[m[32m    deps = test_deps,[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m[32mcc_test([m
+[32m+[m[32m    name = "hellotest",[m
+[32m+[m[32m    srcs = [[m
+[32m+[m[32m        "hello-world.cc",[m
+[32m+[m[32m    ],[m
+[32m+[m[32m    data = [],[m
+[32m+[m[32m    env = device_test_envs(),[m
+[32m+[m[32m    copts = test_copts+ copts(),[m
+[32m+[m[32m    linkopts = test_linkopts,[m
+[32m+[m[32m    deps = test_deps,[m
+[32m+[m[32m)[m
+[1mdiff --git a/src/fastertransformer/devices/rocm_impl/test/RocmOpsTest.cc b/src/fastertransformer/devices/rocm_impl/test/RocmOpsTest.cc[m
+[1mindex 4c5fe63..97a3d69 100644[m
+[1m--- a/src/fastertransformer/devices/rocm_impl/test/RocmOpsTest.cc[m
+[1m+++ b/src/fastertransformer/devices/rocm_impl/test/RocmOpsTest.cc[m
+[36m@@ -1,9 +1,28 @@[m
+ #include "src/fastertransformer/devices/testing/TestBase.h"[m
+ #include "src/fastertransformer/devices/rocm_impl/ROCmDevice.h"[m
+ [m
+[32m+[m[32m#include <hip/hip_runtime.h>[m
+[32m+[m
+ using namespace std;[m
+ using namespace fastertransformer;[m
+ [m
+[31m-class RocmOpsTest: public DeviceTestBase {};[m
+ [m
+[32m+[m[32mclass RocmOpsTest: public DeviceTestBase {[m
+[32m+[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mTEST_F(RocmOpsTest, hello) {[m
+[32m+[m[32m    printf("\n**************RocmOpsTest.hello*******************\n");[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mTEST_F(RocmOpsTest, testCopy) {[m
+[32m+[m[32m    printf("\n**************RocmOpsTest.testCopy*******************\n");[m
+[32m+[m[32m    vector<float> expected = {12, 223, 334, 4, 5, 6};[m
+[32m+[m[32m    auto A = createHostBuffer({2, 3}, expected.data());[m
+[32m+[m[32m    auto B = device_->allocateBuffer({DataType::TYPE_FP32, {2, 3}, AllocationType::DEVICE}, {});[m
+[32m+[m[32m    auto C = device_->allocateBuffer({DataType::TYPE_FP32, {2, 3}, AllocationType::HOST}, {});[m
+[32m+[m[32m    device_->copy({*B, *A});[m
+[32m+[m[32m    device_->copy({*C, *B});[m
+ [m
+[32m+[m[32m    assertBufferValueEqual(*C, expected);[m
+[32m+[m[32m}[m
+[1mdiff --git a/src/fastertransformer/devices/testing/TestBase.h b/src/fastertransformer/devices/testing/TestBase.h[m
+[1mindex 188a4a9..e180219 100644[m
+[1m--- a/src/fastertransformer/devices/testing/TestBase.h[m
+[1m+++ b/src/fastertransformer/devices/testing/TestBase.h[m
+[36m@@ -26,8 +26,10 @@[m [mpublic:[m
+         // setenv("FT_DEBUG_LEVEL", "DEBUG", 1);[m
+         // setenv("FT_DEBUG_PRINT_LEVEL", "DEBUG", 1);[m
+ [m
+[32m+[m[32m        printf("***********DeviceTestBase.Setup*************\n");[m
+         initTestDevices();[m
+         initTestDataDir();[m
+[32m+[m[32m        printf("***********DeviceTestBase.Setup end*************\n");[m
+     }[m
+ [m
+     virtual void initTestDevices() {[m
+[36m@@ -42,6 +44,11 @@[m [mpublic:[m
+             autil::EnvUtil::getEnv("HOST_RESERVE_MEMORY_BYTES", host_reserve_memory_size_);[m
+         DeviceFactory::initDevices(device_params);[m
+         device_ = DeviceFactory::getDefaultDevice();[m
+[32m+[m
+[32m+[m[32m        auto devProp = device_->getDeviceProperties();[m
+[32m+[m[32m        printf("\n dev type = %d", (int)devProp.type);[m
+[32m+[m[32m        printf("\n dev id = %d", (int)devProp.id);[m
+[32m+[m[32m        printf("\n device_id_ = %d\n", (int)device_->device_id_);[m
+     }[m
+ [m
+     void initTestDataDir() {[m
+[1mdiff --git a/src/fastertransformer/rocm/BUILD b/src/fastertransformer/rocm/BUILD[m
+[1mindex b071007..620c859 100644[m
+[1m--- a/src/fastertransformer/rocm/BUILD[m
+[1m+++ b/src/fastertransformer/rocm/BUILD[m
+[36m@@ -4,6 +4,7 @@[m [mcc_library([m
+     name = "cuda_shims",[m
+     hdrs = [[m
+         "cuda_shims.h",[m
+[32m+[m[32m        "hipblasMMWrapper.h",[m
+     ],[m
+     deps = [[m
+         "@local_config_rocm//rocm:rocm_headers",[m
+[36m@@ -12,3 +13,28 @@[m [mcc_library([m
+     include_prefix = "src",[m
+     visibility = ["//visibility:public"],[m
+ )[m
+[32m+[m
+[32m+[m[32mcc_library([m
+[32m+[m[32m    name = "rocm_utils",[m
+[32m+[m[32m    srcs = glob([[m
+[32m+[m[32m        "*.cc"[m
+[32m+[m[32m        #"src/fastertransformer/rocm/utils/*.cc",[m
+[32m+[m[32m    ]),[m
+[32m+[m[32m    hdrs = glob([[m
+[32m+[m[32m        "*.h",[m
+[32m+[m[32m        #"src/fastertransformer/rocm/utils/*.h",[m
+[32m+[m[32m    ]),[m
+[32m+[m[32m    deps = [[m
+[32m+[m[32m        "@local_config_rocm//rocm:rocm_headers",[m
+[32m+[m[32m        "@local_config_rocm//rocm:rocm",[m
+[32m+[m[32m        "@local_config_rocm//rocm:rocblas",[m
+[32m+[m[32m        "//src/fastertransformer/utils:logger",[m
+[32m+[m[32m        "//src/fastertransformer/utils:assert_utils",[m
+[32m+[m[32m        "//src/fastertransformer/utils:utils",[m
+[32m+[m[32m        "//src/fastertransformer/core:allocator",[m
+[32m+[m[32m    ],[m
+[32m+[m[32m    copts = rocm_copts(),[m
+[32m+[m[32m    include_prefix = "src",[m
+[32m+[m[32m    visibility = ["//visibility:public"],[m
+[32m+[m
+[32m+[m[32m)[m
+\ No newline at end of file[m

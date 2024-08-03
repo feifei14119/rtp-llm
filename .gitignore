@@ -44,3 +44,4 @@ package/maga_start.sh
 
 model_rpc_service_pb2.py
 model_rpc_service_pb2_grpc.py
+maga_transformer/test/model_test/fake_test/testdata/qwen_0.5b/qwen/*.pt

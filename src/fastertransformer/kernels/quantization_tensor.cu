@@ -475,28 +475,32 @@ __global__ void perColDequantization(T*            dst,
                                      float*        dbgfp  = nullptr,
                                      int*          dbgint = nullptr) {
     const uint8_t* pSrc      = (const uint8_t*)src;
-    uint32_t       colBlkIdx = blockIdx.x; // 1 blk = 2 col
-    uint32_t       rawBlkIdx = blockIdx.y;
+    uint32_t       colPckIdx = blockIdx.y;
+    uint32_t       rowBlkIdx = blockIdx.x;
     
-    // one loop process 1 col uint8 input, and 2 cols of output
-    uint8_t tmpu8 = pSrc[(groupSize * rawBlkIdx + threadIdx.x) * numCols / 2 + colBlkIdx];
-    float scale = cuda_cast<float>(scalePtr[rawBlkIdx * numCols + colBlkIdx * 2]);
-    float zeros = cuda_cast<float>(zerosPtr[rawBlkIdx * numCols + colBlkIdx * 2]);
+    float scalel = cuda_cast<float>(scalePtr[rowBlkIdx * numCols + colPckIdx*2 + 0]);
+    float scaleh = cuda_cast<float>(scalePtr[rowBlkIdx * numCols + colPckIdx*2 + 1]);
+    float zerosl = cuda_cast<float>(zerosPtr[rowBlkIdx * numCols + colPckIdx*2 + 0]);
+    float zerosh = cuda_cast<float>(zerosPtr[rowBlkIdx * numCols + colPckIdx*2 + 1]);
 
-    uint8_t tmpi4l = tmpu8 & 0x0F;
-    uint8_t tmpi4h = (tmpu8 >> 4) & 0x0F;
+    uint8_t tmpu8 = pSrc[(groupSize * rowBlkIdx + threadIdx.x) * numCols/2 + colPckIdx];
 
-    tmpi4l = tmpi4l + 8;
-    tmpi4h = tmpi4h + 8;
+    uint8_t tmpu4l = tmpu8 & 0x0F;
+    uint8_t tmpu4h = (tmpu8 >> 4) & 0x0F;
+
+    if(tmpu4l & 0x08) tmpu4l|= 0xF0;
+    if(tmpu4h & 0x08) tmpu4h|= 0xF0;
+    int8_t tmpi4l = tmpu4l;
+    int8_t tmpi4h = tmpu4h;
 
     float tmpfpl = cuda_cast<float>(tmpi4l);
     float tmpfph = cuda_cast<float>(tmpi4h);
 
-    T vall = cuda_cast<T>(tmpfpl * scale - 8 * scale + zeros);
-    T valh = cuda_cast<T>(tmpfph * scale - 8 * scale + zeros);
+    T vall = cuda_cast<T>(tmpfpl * scalel);
+    T valh = cuda_cast<T>(tmpfph * scaleh);
 
-    dst[threadIdx.x * numCols + colBlkIdx * 2 + 0] = vall;
-    dst[threadIdx.x * numCols + colBlkIdx * 2 + 1] = valh;
+    dst[(groupSize * rowBlkIdx + threadIdx.x) * numCols + colPckIdx*2 + 0] = vall;
+    dst[(groupSize * rowBlkIdx + threadIdx.x) * numCols + colPckIdx*2 + 1] = valh;
 }
 
 template<typename T>
@@ -509,9 +513,9 @@ void invokePerColDequantizationInt4x2(T*            dst,
                                       const int64_t groupSize,
                                       cudaStream_t  stream) {
     const dim3 block(groupSize);
-    const dim3 grid(numCols/2, numRows/groupSize , 1);
+    const dim3 grid(numRows/groupSize, numCols/2, 1);
 
-    printf("[DEQNT] numRows = %d, numCols = %d\n", numRows, numCols);
+    printf("[DEQNT] numRows = %d, numCols = %d, groupSize = %d\n", numRows, numCols, groupSize);
     printf("[DEQNT] block = %d, %d, %d\n", block.x, block.y, block.z);
     printf("[DEQNT] grid = %d, %d, %d\n", grid.x, grid.y, grid.z);
     perColDequantization<T>
@@ -557,26 +561,19 @@ __global__ void perRowDequantization(T*            dst,
 
     uint8_t tmpu8 = pSrc[rowIdx * numCols/2 + colGrpIdx * groupSize/2 + threadIdx.x];
 
-    uint8_t tmpi4l = tmpu8 & 0x0F;
-    uint8_t tmpi4h = (tmpu8 >> 4) & 0x0F;
+    uint8_t tmpu4l = tmpu8 & 0x0F;
+    uint8_t tmpu4h = (tmpu8 >> 4) & 0x0F;
 
-    /*tmpi4l = tmpi4l + 8;
-    tmpi4h = tmpi4h + 8;
-
-    float tmpfpl = cuda_cast<float>(tmpi4l);
-    float tmpfph = cuda_cast<float>(tmpi4h);
-
-    T vall = cuda_cast<T>(tmpfpl * scale - 8 * scale + zeros);
-    T valh = cuda_cast<T>(tmpfph * scale - 8 * scale + zeros);*/
-
-    if(tmpi4l & 0x08) tmpi4l |= 0xF0;
-    if(tmpi4h & 0x08) tmpi4h |= 0xF0;
+    if(tmpu4l & 0x08) tmpu4l|= 0xF0;
+    if(tmpu4h & 0x08) tmpu4h|= 0xF0;
+    int8_t tmpi4l = tmpu4l;
+    int8_t tmpi4h = tmpu4h;
 
     float tmpfpl = cuda_cast<float>(tmpi4l);
     float tmpfph = cuda_cast<float>(tmpi4h);
 
-    T vall = cuda_cast<T>(tmpfpl * scale + zeros);
-    T valh = cuda_cast<T>(tmpfph * scale + zeros);
+    T vall = cuda_cast<T>(tmpfpl * scale);
+    T valh = cuda_cast<T>(tmpfph * scale);
 
     dst[rowIdx * numCols + colGrpIdx * groupSize + threadIdx.x * 2 + 0] = vall;
     dst[rowIdx * numCols + colGrpIdx * groupSize + threadIdx.x * 2 + 1] = valh;
@@ -616,3 +613,4 @@ INSTANTIATE_INVOKE_PER_ROW_DEQUANTIZATION_INT4X2(half);
 INSTANTIATE_INVOKE_PER_ROW_DEQUANTIZATION_INT4X2(__nv_bfloat16);
 #endif
 }  // namespace fastertransformer
+ // 1 blk = 2 col

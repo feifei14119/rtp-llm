@@ -37,7 +37,7 @@ public:
     virtual void initTestDevices() {
         auto device_name = getenv("TEST_USING_DEVICE");
         auto device_params = device_name
-            ? ft::GlobalDeviceParams{{{ft::getDeviceType(device_name), ft::DeviceInitParams{0}}}}
+            ? ft::GlobalDeviceParams{{{ft::getDeviceType(device_name), ft::DeviceInitParams{2}}}}
             : ft::DeviceFactory::getDefaultGlobalDeviceParams();
         auto& default_device_params = device_params.device_params[0].second;
         default_device_params.device_reserve_memory_bytes =

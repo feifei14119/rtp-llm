@@ -74,7 +74,7 @@ fi
 rocm_driver_version=$ret
 echo $rocm_driver_version
 
-docker run --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --ulimit nofile=655350:655350 --ulimit memlock=-1 --cpu-shares=15360 --cpu-quota=9600000 --cpu-period=100000 --memory=500000m -d --network=host --device=/dev/kfd --device=/dev/dri --ipc=host --group-add video --name $CONTAINER_NAME -v $HOME:/home/$USER -v $CONTAINER_DIR/initContainer.sh:$CONTAINER_DIR/initContainer.sh $IMAGE /sbin/init 1> /dev/null
+docker run --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --ulimit nofile=655350:655350 --ulimit memlock=-1 --cpu-shares=15360 --cpu-quota=9600000 --cpu-period=100000 --memory=500000m -d --network=host --device=/dev/kfd --device=/dev/dri --ipc=host --group-add video --name $CONTAINER_NAME -v /home/feiw/ali:/ali -v $HOME:/home/$USER -v $CONTAINER_DIR/initContainer.sh:$CONTAINER_DIR/initContainer.sh $IMAGE /sbin/init 1> /dev/null
 
 if [ $? -ne 0 ]; then
     echo "ERROR, run container failed, please check."
