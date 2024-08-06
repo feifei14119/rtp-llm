@@ -45,17 +45,19 @@ FfnLayerOutput ROCmDevice::moeFfnLayer(const FfnLayerParams& params) {
     const int    start_expert         = num_experts_per_node * parallelism_config.ep_rank;
     const int    end_expert           = start_expert + num_experts_per_node;
 
-    const size_t num_topkTokens = pad_to_multiple_of_16(num_token * top_k);
+    // const size_t num_topkTokens = pad_to_multiple_of_16(num_token * top_k);
+    const size_t num_topkTokens = num_token * top_k;
     const auto   topk_scales    = allocateBuffer({DataType::TYPE_FP32, {num_token, top_k}});
     // top_k will be 1, 2, 4, 8, ..., 2**n
     // topk_rowColID >> log2(top_k)   = rowID (i.e. tokenID)
     // topk_rowColID &&     (top_k-1) = colID (i.e. k_ID)
     const auto topk_rowColID                 = allocateBuffer({DataType::TYPE_INT32, {num_token, top_k}});
-    const auto topk_expertID                 = allocateBuffer({DataType::TYPE_INT32, {num_token, top_k}});
     const auto topk_rowColID_sorted          = allocateBuffer({DataType::TYPE_INT32, {num_token, top_k}});
-    const auto topk_expertID_sorted          = allocateBuffer({DataType::TYPE_INT32, {num_topkTokens}});
+    const auto topk_expertID                 = allocateBuffer({DataType::TYPE_INT32, {num_token, top_k}});
+    const auto topk_expertID_sorted          = allocateBuffer({DataType::TYPE_INT32, {num_token, top_k}});
     const auto total_rows_before_expert      = allocateBuffer({DataType::TYPE_INT32, {num_experts_per_node}});
-    const auto total_rows_before_expert_host = allocateBuffer({DataType::TYPE_INT32, {num_experts_per_node}});
+    const auto total_rows_before_expert_host =
+        allocateBuffer({DataType::TYPE_INT32, {num_experts_per_node}, AllocationType::HOST});
 
     const auto expanded_source_row_to_expanded_dest_row = allocateBuffer({DataType::TYPE_INT32, {num_token, top_k}});
 

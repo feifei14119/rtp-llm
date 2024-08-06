@@ -10,10 +10,6 @@
 #endif
 namespace fastertransformer {
 
-static inline size_t pad_to_multiple_of_16(const size_t& input) {
-    static constexpr int ALIGNMENT = 16;
-    return ALIGNMENT * ((input + ALIGNMENT - 1) / ALIGNMENT);
-}
 /**
  * \brief Describes what parallelism mode the MoE is using
  *

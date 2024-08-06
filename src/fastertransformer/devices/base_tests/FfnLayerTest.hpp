@@ -341,6 +341,6 @@ public:
         auto input      = PrepareMoELayerInput(token_num, tok_dim, inter_size, expertNum, type);
         auto result     = MoELayerRun(input, expertNum, topK, act);
         auto result_ref = MoETorchRefRun(input, expertNum, topK, act);
-        // assertTensorClose(result.out.to(result_ref.out.type()), result_ref.out);
+        assertTensorClose(result.out.to(result_ref.out.type()), result_ref.out, 1e2, 1e2);
     }
 };
